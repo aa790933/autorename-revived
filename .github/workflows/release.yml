@@ -64,12 +64,14 @@ jobs:
           key: pnpm-${{ hashFiles('gui/pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-
-      - name: Build Tauri GUI (portable)
+      - name: Install npm deps
         shell: pwsh
         working-directory: gui
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm tauri build --config ../src-tauri/tauri.conf.json
+        run: pnpm install --frozen-lockfile
+      - name: Build Tauri GUI (portable)
+        shell: pwsh
+        working-directory: src-tauri
+        run: node ../gui/node_modules/@tauri-apps/cli/bin/tauri.js build
       - name: Verify GUI EXE
         shell: pwsh
         run: |
@@ -144,12 +146,14 @@ jobs:
           key: pnpm-${{ hashFiles('gui/pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-
-      - name: Build Tauri MSI
+      - name: Install npm deps
         shell: pwsh
         working-directory: gui
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm tauri build --config ../src-tauri/tauri.conf.json --bundles msi
+        run: pnpm install --frozen-lockfile
+      - name: Build Tauri MSI
+        shell: pwsh
+        working-directory: src-tauri
+        run: node ../gui/node_modules/@tauri-apps/cli/bin/tauri.js build --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
