@@ -1,380 +1,176 @@
-import { setState } from '../lib/state';
-import { loadConfig, saveConfig, type ConfigData } from '../lib/config-store';
-import { testApiConnection, saveConfigBatch } from '../lib/sidecar';
-import { showToast } from '../lib/toast';
-import { escapeHtml } from '../lib/utils';
+import { getState, setState, SettingsState, subscribe } from '../lib/state';
+import { saveSettings, getSettings, testConnection } from '../lib/invoke';
+import { SUPPORTED_EXTENSIONS } from '../lib/utils';
 
-type FieldType = 'string' | 'secret' | 'number' | 'toggle' | 'auto-or-bool';
+export function renderSettingsView(container: HTMLElement, state: SettingsState): void {
+  container.innerHTML = `
+    <div class="settings-container">
+      <header class="settings-header">
+        <h1>AutoRename Revived</h1>
+        <div class="header-actions">
+          <button id="btn-save" class="btn btn-primary" title="Save settings">Save</button>
+          <button id="btn-test" class="btn btn-secondary" title="Test connection">Test Connection</button>
+        </div>
+      </header>
 
-interface FieldDef {
-  key: string;
-  label: string;
-  type: FieldType;
-  hint?: string;
-  configKey: string;
-}
+      <main class="settings-body">
+        <section class="card">
+          <h2>AI Provider</h2>
+          <div class="field">
+            <label for="provider">Provider</label>
+            <select id="provider">
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="custom">Custom Endpoints (Ollama/vLLM)</option>
+            </select>
+          </div>
 
-const PROVIDER_DEFS: Record<string, { label: string; icon: string; fields: FieldDef[] }> = {
-  gemini: {
-    label: 'Google Gemini',
-    icon: '<svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M12 2L2 19.5h20L12 2zm0 4l6.5 11.5h-13L12 6z"/></svg>',
-    fields: [
-      { key: 'api_key', label: 'API Key', type: 'secret', configKey: 'ai' },
-      { key: 'gemini_model', label: 'Text Model', type: 'string', hint: 'e.g. gemini-2.0-flash', configKey: 'ai' },
-      { key: 'gemini_base_url', label: 'Base URL (optional)', type: 'string', configKey: 'ai' },
-    ],
-  },
-  openai: {
-    label: 'OpenAI',
-    icon: '<svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><circle cx="12" cy="12" r="10"/></svg>',
-    fields: [
-      { key: 'api_key', label: 'API Key', type: 'secret', configKey: 'ai' },
-      { key: 'model', label: 'Model', type: 'string', hint: 'e.g. gpt-4o-mini', configKey: 'ai' },
-    ],
-  },
-  custom: {
-    label: 'Custom / Ollama / vLLM',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M12 2v20M2 12h20"/></svg>',
-    fields: [
-      { key: 'api_key', label: 'API Key', type: 'secret', configKey: 'ai' },
-      { key: 'custom_model', label: 'Model', type: 'string', hint: 'e.g. llama3.2, qwen-72b', configKey: 'ai' },
-      { key: 'custom_base_url', label: 'Base URL', type: 'string', hint: 'e.g. http://localhost:11434/v1', configKey: 'ai' },
-    ],
-  },
-};
+          <div class="field" id="field-model">
+            <label for="model">Model</label>
+            <input type="text" id="model" placeholder="gemini-3.1-flash-lite" />
+          </div>
 
-const COMMON_AI_FIELDS: FieldDef[] = [
-  { key: 'temperature', label: 'Temperature', type: 'number', hint: '0.0 = deterministic, 1.0 = creative', configKey: 'ai' },
-  { key: 'timeout', label: 'Timeout (seconds)', type: 'number', configKey: 'ai' },
-];
+          <div class="field" id="field-api-key">
+            <label for="api-key">API Key</label>
+            <input type="password" id="api-key" placeholder="Enter your API key" />
+          </div>
 
-const DOCUMENT_FIELDS: FieldDef[] = [
-  { key: 'vision', label: 'Vision (scanned docs)', type: 'auto-or-bool', hint: 'auto = use AI vision for scanned pages', configKey: 'pdf' },
-];
+          <div class="field" id="field-custom-url" style="display:none;">
+            <label for="custom-base-url">Base URL</label>
+            <input type="url" id="custom-base-url" placeholder="http://localhost:11434" />
+          </div>
+        </section>
 
-const NAMING_FIELDS: FieldDef[] = [
-  { key: 'template', label: 'Filename Template', type: 'string', hint: '{date}, {company}, {doctype}, {category}, {subject}, {original}, {sequence}', configKey: 'naming' },
-  { key: 'fallback', label: 'Fallback Template', type: 'string', hint: 'Used when template yields empty name', configKey: 'naming' },
-  { key: 'date_format', label: 'Date Format', type: 'string', hint: 'strftime format, e.g. %Y%m%d', configKey: 'naming' },
-  { key: 'separator', label: 'Separator', type: 'string', configKey: 'naming' },
-  { key: 'max_length', label: 'Max Filename Length', type: 'number', configKey: 'naming' },
-  { key: 'sequence_zerofill', label: 'Sequence Zero-Fill', type: 'number', hint: 'Pad sequence numbers to this width', configKey: 'naming' },
-];
+        <section class="card">
+          <h2>Naming Pattern</h2>
+          <div class="field">
+            <label for="naming-pattern">Pattern</label>
+            <input type="text" id="naming-pattern" placeholder="{date}_{company}_{doctype}" />
+          </div>
+          <p class="hint">Available variables: {date}, {company}, {doctype}</p>
+        </section>
 
-const UNDO_FIELDS: FieldDef[] = [
-  { key: 'enabled', label: 'Enable Undo', type: 'toggle', configKey: 'undo' },
-  { key: 'log_path', label: 'Log Path', type: 'string', hint: 'Path to rename history log', configKey: 'undo' },
-  { key: 'max_entries', label: 'Max Entries', type: 'number', configKey: 'undo' },
-];
+        <section class="card" id="connection-status">
+          <h2>Connection Status</h2>
+          <div class="status-row">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Not tested</span>
+          </div>
+        </section>
 
-const GENERAL_FIELDS: FieldDef[] = [
-  { key: 'debug', label: 'Debug Mode', type: 'toggle', configKey: '_general' },
-  { key: 'max_workers', label: 'Max Workers', type: 'number', hint: 'Parallel rename threads', configKey: '_general' },
-];
-
-function getNested(obj: Record<string, unknown>, dottedKey: string): unknown {
-  return dottedKey.split('.').reduce<unknown>((acc, part) => {
-    if (acc && typeof acc === 'object') return (acc as Record<string, unknown>)[part];
-    return undefined;
-  }, obj);
-}
-
-function autoOrBoolToString(val: unknown): string {
-  if (val === 'auto') return 'auto';
-  return Boolean(val) ? 'true' : 'false';
-}
-
-function stringToAutoOrBool(val: string): string {
-  if (val === 'auto' || val === '' || val === undefined) return val;
-  return val.toLowerCase();
-}
-
-function renderInput(def: FieldDef, value: unknown, fullKey: string): string {
-  const strVal = String(value ?? '');
-  const id = `field-${fullKey.replace(/\./g, '-')}`;
-
-  switch (def.type) {
-    case 'secret':
-      return `
-        <div class="input-group">
-          <input id="${id}" type="password" class="input input-sm" value="${escapeHtml(strVal)}" autocomplete="off">
-          <button type="button" class="btn-toggle-password btn btn-ghost btn-sm" aria-label="Toggle visibility">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path class="toggle-eye-closed" d="M10.585 10.585a2 2 0 102.83 2.83 2 2 0 00-2.83-2.83z"/>
-              <path class="toggle-eye-open" style="display:none" d="M1 12s8 6 11 6 11-6 11-6-8-6-11-6S1 12 1 12z"/>
-            </svg>
-          </button>
-        </div>`;
-    case 'auto-or-bool': {
-      const opts = ['auto', 'true', 'false']
-        .map((v) => `<option value="${v}" ${v === autoOrBoolToString(value) ? 'selected' : ''}>${v}</option>`)
-        .join('');
-      return `<select id="${id}" class="input input-sm">${opts}</select>`;
-    }
-    case 'number':
-      return `<input id="${id}" type="number" class="input input-sm" value="${escapeHtml(strVal)}">`;
-    case 'toggle': {
-      const checked = Boolean(value);
-      return `<input id="${id}" type="checkbox" class="checkbox toggle-checkbox" ${checked ? 'checked' : ''}>`;
-    }
-    case 'string':
-    default:
-      return `<input id="${id}" type="text" class="input input-sm" value="${escapeHtml(strVal)}" autocomplete="off">`;
-  }
-}
-
-function renderFieldRow(def: FieldDef, value: unknown, fullKey: string): string {
-  const hintHtml = def.hint ? `<div class="form-hint">${escapeHtml(def.hint)}</div>` : '';
-  return `
-    <div class="settings-field">
-      <label class="label">${escapeHtml(def.label)}</label>
-      ${renderInput(def, value, fullKey)}
-      ${hintHtml}
-    </div>`;
-}
-
-function renderProviderFields(config: ConfigData): string {
-  const provider = config.ai.provider || 'openai';
-  const def = PROVIDER_DEFS[provider] || PROVIDER_DEFS.openai;
-  const fields = [...def.fields, ...COMMON_AI_FIELDS];
-  return fields.map((f) => {
-    const val = f.configKey === '_general'
-      ? (config as unknown as Record<string, unknown>)[f.key]
-      : getNested((config[f.configKey as keyof ConfigData] || {}) as Record<string, unknown>, f.key);
-    return renderFieldRow(f, val, `${f.configKey}.${f.key}`);
-  }).join('');
-}
-
-function renderSection(title: string, fields: FieldDef[], config: ConfigData): string {
-  const rows = fields.map((f) => {
-    const val = f.configKey === '_general'
-      ? (config as unknown as Record<string, unknown>)[f.key]
-      : getNested((config[f.configKey as keyof ConfigData] || {}) as Record<string, unknown>, f.key);
-    return renderFieldRow(f, val, `${f.configKey}.${f.key}`);
-  }).join('');
-  if (!rows) return '';
-  return `
-    <div class="settings-section">
-      <h3>${escapeHtml(title)}</h3>
-      <div class="card card-bordered">${rows}</div>
-    </div>`;
-}
-
-let currentConfig: ConfigData | null = null;
-
-export async function renderSettingsView(root: HTMLElement): Promise<void> {
-  root.innerHTML = `
-    <div class="flex flex-col flex-1 min-h-0 p-6 pt-8">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold">Settings</h2>
-        <button class="btn btn-secondary btn-sm" id="btn-back-from-settings">
-          <svg class="w-3.5 h-3.5 inline-block mr-1 -mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>Back
-        </button>
-      </div>
-      <div id="provider-bar" class="provider-bar mb-4"></div>
-      <div id="settings-content" class="flex-1 overflow-y-auto" style="overflow-x:hidden;padding-right:0.5rem">
-      </div>
-      <div class="flex items-center justify-center gap-2 mt-4" id="settings-footer">
-        <button class="btn btn-secondary btn-sm" id="btn-save-settings">Save All</button>
-        <button class="btn btn-secondary btn-sm" id="btn-test-connection">Test Connection</button>
-      </div>
+        <section class="card">
+          <h2>Supported File Types</h2>
+          <div class="file-types">${Array.from(SUPPORTED_EXTENSIONS)
+            .sort()
+            .map((ext) => `<span class="tag">${ext}</span>`)
+            .join('')}</div>
+        </section>
+      </main>
     </div>
   `;
 
-  document.getElementById('btn-back-from-settings')?.addEventListener('click', () => {
-    setState({ view: 'files' });
+  bindEvents(container, state);
+  syncFormFromState(container, state);
+}
+
+function bindEvents(container: HTMLElement, state: SettingsState): void {
+  const providerSelect = container.querySelector<HTMLSelectElement>('#provider');
+  const modelInput = container.querySelector<HTMLInputElement>('#model');
+  const apiKeyInput = container.querySelector<HTMLInputElement>('#api-key');
+  const customUrlInput = container.querySelector<HTMLInputElement>('#custom-base-url');
+  const namingPatternInput = container.querySelector<HTMLInputElement>('#naming-pattern');
+  const btnSave = container.querySelector<HTMLButtonElement>('#btn-save');
+  const btnTest = container.querySelector<HTMLButtonElement>('#btn-test');
+
+  providerSelect?.addEventListener('change', () => {
+    const provider = providerSelect.value;
+    setState({ provider: provider as SettingsState['provider'] });
+    updateProviderFields(provider);
   });
 
-  document.getElementById('btn-test-connection')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-test-connection') as HTMLButtonElement | null;
-    if (btn) { btn.disabled = true; btn.textContent = 'Testing...'; }
+  modelInput?.addEventListener('input', () => {
+    setState({ model: modelInput.value });
+  });
+
+  apiKeyInput?.addEventListener('input', () => {
+    setState({ apiKey: apiKeyInput.value });
+  });
+
+  customUrlInput?.addEventListener('input', () => {
+    setState({ customBaseUrl: customUrlInput.value });
+  });
+
+  namingPatternInput?.addEventListener('input', () => {
+    setState({ namingPattern: namingPatternInput.value });
+  });
+
+  btnSave?.addEventListener('click', async () => {
+    setState({ saveStatus: 'saving', saveMessage: 'Saving...' });
     try {
-      const providerEl = document.getElementById('field-ai-provider') as HTMLSelectElement | null;
-      const apiKeyEl = document.getElementById('field-ai-api_key') as HTMLInputElement | null;
-      const modelEl = document.getElementById('field-ai-model') as HTMLInputElement | null;
-      const provider = providerEl?.value || '';
-      const apiKey = apiKeyEl?.value || '';
-      const model = modelEl?.value || '';
-      const result = await testApiConnection(provider || undefined, apiKey || undefined, model || undefined);
-      showToast(`${result.provider}: ${result.message}`, result.success ? 'success' : 'danger');
-    } catch (err) {
-      showToast(`Connection test failed: ${err}`, 'danger');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Test Connection'; }
+      await saveSettings(getState());
+      setState({ saveStatus: 'success', saveMessage: 'Settings saved' });
+    } catch (e) {
+      setState({ saveStatus: 'error', saveMessage: (e as Error).message });
     }
+    setTimeout(() => setState({ saveStatus: 'idle', saveMessage: '' }), 3000);
   });
 
-  document.getElementById('btn-save-settings')?.addEventListener('click', async () => {
-    await saveAllSettings();
-  });
-
-  const config = await loadConfig();
-  setState({ statusError: '' });
-  currentConfig = config;
-
-  renderProviderBar(config);
-  renderContent(config);
-  bindPasswordToggles();
-}
-
-function renderProviderBar(config: ConfigData): void {
-  const bar = document.getElementById('provider-bar');
-  if (!bar) return;
-  const current = config.ai.provider || 'gemini';
-
-  bar.innerHTML = `<div class="provider-bar-inner">
-    ${Object.entries(PROVIDER_DEFS).map(([key, def]) => {
-      const active = key === current ? ' provider-btn-active' : '';
-      return `<button class="provider-btn${active}" data-provider="${key}">
-        <span class="provider-btn-icon">${def.icon}</span>
-        <span class="provider-btn-label">${def.label}</span>
-      </button>`;
-    }).join('')}
-  </div>`;
-
-  bar.querySelectorAll('.provider-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const provider = (btn as HTMLElement).dataset.provider;
-      if (!provider || !currentConfig) return;
-      currentConfig.ai.provider = provider;
-      renderProviderBar(currentConfig);
-      renderContent(currentConfig);
-      bindPasswordToggles();
-    });
+  btnTest?.addEventListener('click', async () => {
+    setState({ testStatus: 'testing', testMessage: 'Testing connection...' });
+    try {
+      const result = await testConnection();
+      setState({
+        testStatus: result ? 'success' : 'error',
+        testMessage: result ? 'Connection successful' : 'Connection failed',
+      });
+    } catch (e) {
+      setState({ testStatus: 'error', testMessage: (e as Error).message });
+    }
+    setTimeout(() => setState({ testStatus: 'idle', testMessage: '' }), 5000);
   });
 }
 
-function renderContent(config: ConfigData): void {
-  const contentEl = document.getElementById('settings-content');
-  if (!contentEl) return;
-
-  const provider = config.ai.provider || 'gemini';
-
-  const providerFieldsHtml = renderProviderFields(config);
-  const docHtml = renderSection('Document Processing', DOCUMENT_FIELDS, config);
-  const namingHtml = renderSection('File Naming', NAMING_FIELDS, config);
-  const undoHtml = renderSection('Undo History', UNDO_FIELDS, config);
-  const generalHtml = renderSection('General', GENERAL_FIELDS, config);
-
-  contentEl.innerHTML = `
-    <div class="space-y-4">
-      <div class="settings-section">
-        <h3>${escapeHtml(PROVIDER_DEFS[provider]?.label || provider)}</h3>
-        <div class="card card-bordered">${providerFieldsHtml}</div>
-      </div>
-      ${docHtml}
-      ${namingHtml}
-      ${undoHtml}
-      ${generalHtml}
-    </div>
-  `;
-}
-
-function bindPasswordToggles(): void {
-  document.querySelectorAll('.btn-toggle-password').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const input = btn.closest('.input-group')?.querySelector('input') as HTMLInputElement | null;
-      if (!input) return;
-      input.type = input.type === 'password' ? 'text' : 'password';
-    });
-  });
-}
-
-async function saveAllSettings(): Promise<void> {
-  if (!currentConfig) {
-    showToast('No configuration loaded', 'warning');
-    return;
-  }
-
-  const updates: Array<{ key: string; value: string }> = [];
-
-  const allFields: FieldDef[] = [
-    ...Object.values(PROVIDER_DEFS).flatMap((d) => d.fields),
-    ...COMMON_AI_FIELDS,
-    ...DOCUMENT_FIELDS,
-    ...NAMING_FIELDS,
-    ...UNDO_FIELDS,
-    ...GENERAL_FIELDS,
-  ];
-
-  const seen = new Set<string>();
-  for (const field of allFields) {
-    const fullKey = `${field.configKey}.${field.key}`;
-    if (seen.has(fullKey)) continue;
-    seen.add(fullKey);
-
-    const id = `field-${fullKey.replace(/\./g, '-')}`;
-    const el = document.getElementById(id);
-    if (!el) continue;
-
-    let rawValue: string;
-    if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-      rawValue = el.checked ? 'true' : 'false';
-    } else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
-      rawValue = el.value;
-    } else {
-      continue;
-    }
-
-    let oldValue: string;
-    if (field.configKey === '_general') {
-      oldValue = String((currentConfig as unknown as Record<string, unknown>)[field.key] ?? '');
-    } else {
-      const sectionData = (currentConfig[field.configKey as keyof ConfigData] || {}) as Record<string, unknown>;
-      oldValue = String(getNested(sectionData, field.key) ?? '');
-    }
-
-    const normalizedOld = field.type === 'auto-or-bool' ? autoOrBoolToString(oldValue) : oldValue;
-    const normalizedNew = field.type === 'auto-or-bool' ? stringToAutoOrBool(rawValue) : rawValue;
-
-    if (normalizedOld !== normalizedNew) {
-      updates.push({ key: fullKey, value: normalizedNew });
-
-      if (field.configKey === '_general') {
-        (currentConfig as unknown as Record<string, unknown>)[field.key] =
-          field.type === 'toggle' ? normalizedNew === 'true' :
-          field.type === 'number' ? Number(normalizedNew) : normalizedNew;
-      } else {
-        const section = currentConfig[field.configKey as keyof ConfigData] as Record<string, unknown>;
-        if (section) {
-          section[field.key] =
-            field.type === 'toggle' ? normalizedNew === 'true' :
-            field.type === 'number' ? Number(normalizedNew) : normalizedNew;
-        }
-      }
-    }
-  }
-
-  updates.push({ key: 'ai.provider', value: currentConfig.ai.provider });
-
-  if (!updates.length) {
-    showToast('No changes to save', 'info');
-    return;
-  }
-
-  try {
-    await saveConfig(currentConfig);
-
-    const result = await saveConfigBatch(updates);
-    if (result.failed > 0 && result.saved > 0) {
-      showToast(`${result.saved} saved, ${result.failed} failed`, 'warning');
-    } else if (result.failed > 0) {
-      showToast(`Save failed: ${result.errors?.[0] || 'Unknown error'}`, 'danger');
-    } else {
-      showToast(`${result.saved} settings saved`, 'success');
-    }
-
-    renderProviderBar(currentConfig);
-    renderContent(currentConfig);
-    bindPasswordToggles();
-  } catch (e) {
-    showToast(`Save failed: ${e}`, 'danger');
+function updateProviderFields(provider: string): void {
+  const customUrlField = document.getElementById('field-custom-url');
+  if (customUrlField) {
+    customUrlField.style.display = provider === 'custom' ? 'block' : 'none';
   }
 }
 
-export function destroySettingsView(): void {
-  currentConfig = null;
+function syncFormFromState(container: HTMLElement, state: SettingsState): void {
+  const providerSelect = container.querySelector<HTMLSelectElement>('#provider');
+  const modelInput = container.querySelector<HTMLInputElement>('#model');
+  const apiKeyInput = container.querySelector<HTMLInputElement>('#api-key');
+  const customUrlInput = container.querySelector<HTMLInputElement>('#custom-base-url');
+  const namingPatternInput = container.querySelector<HTMLInputElement>('#naming-pattern');
+  const statusDot = container.querySelector<HTMLSpanElement>('#status-dot');
+  const statusText = container.querySelector<HTMLSpanElement>('#status-text');
+
+  providerSelect && (providerSelect.value = state.provider);
+  modelInput && (modelInput.value = state.model);
+  apiKeyInput && (apiKeyInput.value = state.apiKey);
+  customUrlInput && (customUrlInput.value = state.customBaseUrl);
+  namingPatternInput && (namingPatternInput.value = state.namingPattern);
+
+  updateProviderFields(state.provider);
+
+  if (statusDot && statusText) {
+    statusDot.className = 'status-dot';
+    switch (state.testStatus) {
+      case 'success':
+        statusDot.classList.add('status-success');
+        statusText.textContent = state.testMessage || 'Connected';
+        break;
+      case 'error':
+        statusDot.classList.add('status-error');
+        statusText.textContent = state.testMessage || 'Connection failed';
+        break;
+      case 'testing':
+        statusDot.classList.add('status-testing');
+        statusText.textContent = 'Testing...';
+        break;
+      default:
+        statusText.textContent = 'Not tested';
+    }
+  }
 }

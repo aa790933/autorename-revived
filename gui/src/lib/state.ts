@@ -1,88 +1,50 @@
-import type { FileResult, BatchResult } from './sidecar';
-
-export type AppView = 'files' | 'settings' | 'about';
-
-export interface FileEntry {
-  path: string;
-  name: string;
-  status: 'pending' | 'renamed' | 'skipped' | 'failed';
-  result?: FileResult;
+export interface SettingsState {
+  provider: 'gemini' | 'openai' | 'custom';
+  apiKey: string;
+  model: string;
+  customBaseUrl: string;
+  namingPattern: string;
+  testStatus: 'idle' | 'testing' | 'success' | 'error';
+  testMessage: string;
+  saveStatus: 'idle' | 'saving' | 'success' | 'error';
+  saveMessage: string;
 }
 
-export interface AppState {
-  view: AppView;
-  files: FileEntry[];
-  processing: boolean;
-  progress: string;
-  lastResult: BatchResult | null;
-  dryRunResult: BatchResult | null;
-  statusError: string;
-  lastBatchId: string | null;
+export function defaultSettings(): SettingsState {
+  return {
+    provider: 'gemini',
+    apiKey: '',
+    model: 'gemini-3.1-flash-lite',
+    customBaseUrl: '',
+    namingPattern: '{date}_{company}_{doctype}',
+    testStatus: 'idle',
+    testMessage: '',
+    saveStatus: 'idle',
+    saveMessage: '',
+  };
 }
 
-type Listener = (state: AppState) => void;
+type Listener = () => void;
 
-const listeners: Set<Listener> = new Set();
+let state = defaultSettings();
+const listeners = new Set<Listener>();
 
-let state: AppState = {
-  view: 'files',
-  files: [],
-  processing: false,
-  progress: '',
-  lastResult: null,
-  dryRunResult: null,
-  statusError: '',
-  lastBatchId: null,
-};
+export function initState(): void {
+  state = defaultSettings();
+}
 
-export function getState(): Readonly<AppState> {
+export function getState(): SettingsState {
   return state;
 }
 
-export function setState(partial: Partial<AppState>): void {
+export function setState(partial: Partial<SettingsState>): void {
   state = { ...state, ...partial };
-  listeners.forEach((fn) => fn(state));
+  listeners.forEach((l) => l());
 }
 
-export function subscribe(fn: Listener): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function addFiles(paths: string[]): void {
-  const existing = new Set(state.files.map((f) => f.path));
-  const newEntries: FileEntry[] = paths
-    .filter((p) => !existing.has(p))
-    .map((p) => ({
-      path: p,
-      name: p.split(/[\\/]/).pop() || p,
-      status: 'pending' as const,
-    }));
-  setState({ files: [...state.files, ...newEntries], dryRunResult: null, lastResult: null });
-}
-
-export function clearFiles(): void {
-  setState({ files: [], dryRunResult: null, lastResult: null, progress: '', statusError: '', lastBatchId: null });
-}
-
-function normalizePath(p: string): string {
-  return p.replace(/\\/g, '/').toLowerCase();
-}
-
-export function updateFileStatuses(result: BatchResult, isDryRun = false): void {
-  const resultMap = new Map(result.files.map((f) => [normalizePath(f.file), f]));
-  const updatedFiles = state.files.map((entry) => {
-    const fileResult = resultMap.get(normalizePath(entry.path));
-    if (fileResult) {
-      return {
-        ...entry,
-        status: isDryRun && fileResult.status === 'renamed'
-          ? entry.status
-          : (fileResult.status as FileEntry['status']),
-        result: fileResult,
-      };
-    }
-    return entry;
-  });
-  setState({ files: updatedFiles });
+export function subscribe(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

@@ -1,48 +1,215 @@
-/**
- * AutoRename-Revived GUI - Shared CSS Components
- *
- * Import this file as the Tailwind CSS input.
- *
- * Z-Index Hierarchy:
- *   100   - Titlebar/header
- *   1000  - Modals
- *   1100  - Toasts (must be above modals)
- *   10000 - Skip links (accessibility)
- */
+:root {
+  --color-bg: #1e1e2e;
+  --color-surface: #2a2a3e;
+  --color-surface-alt: #313244;
+  --color-text: #cdd6f4;
+  --color-text-muted: #a6adc8;
+  --color-primary: #89b4fa;
+  --color-primary-hover: #74c7ec;
+  --color-success: #a6e3a1;
+  --color-error: #f38ba8;
+  --color-warning: #fab387;
+  --color-border: #45475a;
+  --radius: 8px;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
 
-@import "tailwindcss";
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-/* Generated color palette (run `npm run colors` to generate) */
-@import './generated-colors.css';
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  overflow: hidden;
+  height: 100vh;
+}
 
-/* Source paths for Tailwind class detection */
-@source "../**/*.{html,ts}";
-@source "../../*.html";
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-/* Theme variables must load first - provides semantic color mappings */
-@import './theme-variables.css';
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
 
-/* Base reset - supplements Tailwind Preflight */
-@import './base-reset.css';
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
 
-/* Typography system - unified font sizes */
-@import './typography.css';
+.settings-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
 
-/* Component styles */
-@import './components/buttons.css';
-@import './components/inputs.css';
-@import './components/cards.css';
-@import './components/modals.css';
-@import './components/settings.css';
-@import './components/toasts.css';
-@import './components/titlebar.css';
-@import './components/about.css';
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
 
-/* App-specific */
-@import './components/filelist.css';
-@import './components/statusbar.css';
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
-/* Utilities */
-@import './animations.css';
-@import './platform.css';
-@import './accessibility.css';
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--color-primary);
+}
+
+.field input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  font-family: var(--font-sans);
+}
+
+.btn:hover {
+  opacity: 0.85;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #1e1e2e;
+}
+
+.btn-secondary {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.status-dot.status-success {
+  background: var(--color-success);
+}
+
+.status-dot.status-error {
+  background: var(--color-error);
+}
+
+.status-dot.status-testing {
+  background: var(--color-warning);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.file-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 2px 8px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.view-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}

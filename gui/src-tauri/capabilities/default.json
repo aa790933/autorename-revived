@@ -1,34 +1,16 @@
 {
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/.schema/schema.json",
   "identifier": "default",
-  "description": "Default capabilities for AutoRename-Revived",
+  "description": "Default capability for AutoRename Revived",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "core:window:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-close",
-    "core:window:allow-minimize",
-    "core:window:allow-toggle-maximize",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "binaries/autorename-revived-cli",
-          "sidecar": true,
-          "args": true
-        }
-      ]
-    },
+    "shell:default",
     "dialog:default",
     "fs:default",
-    "fs:allow-read-dir",
-    "fs:allow-rename",
-    "fs:allow-read-text-file",
-    "fs:allow-write-text-file",
-    {
-      "identifier": "fs:scope",
-      "allow": [{ "path": "**" }]
-    },
-    "opener:default"
+    "fs:allow-read-all",
+    "fs:allow-write-all",
+    "fs:allow-remove-all",
+    "store:default"
   ]
 }

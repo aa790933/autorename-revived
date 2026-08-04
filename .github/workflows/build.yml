@@ -1,0 +1,49 @@
+name: Build Portable GUI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gui/src-tauri
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install frontend dependencies
+        working-directory: gui
+        run: pnpm install
+
+      - name: Build Tauri GUI
+        working-directory: gui/src-tauri
+        run: npx tauri build
+
+      - name: Package portable ZIP
+        shell: pwsh
+        run: |
+          $outDir = "dist"
+          New-Item -ItemType Directory -Force -Path $outDir
+          $exeDir = "gui/src-tauri/target/release"
+          $exe = Get-ChildItem $exeDir -Filter "*.exe" | Select-Object -First 1
+          Copy-Item $exe.FullName $outDir/
+          Compress-Archive -Path "$outDir/*" -DestinationPath "autorename-revived-portable.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autorename-revived-portable
+          path: autorename-revived-portable.zip
