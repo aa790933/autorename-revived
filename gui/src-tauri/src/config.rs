@@ -9,6 +9,12 @@ use tauri_plugin_store::Store;
 pub struct PdfConfig {
     pub vision: String,
     pub vision_provider: String,
+    #[serde(default = "default_text_quality_threshold")]
+    pub text_quality_threshold: f64,
+}
+
+fn default_text_quality_threshold() -> f64 {
+    0.2
 }
 
 impl Default for PdfConfig {
@@ -16,6 +22,7 @@ impl Default for PdfConfig {
         Self {
             vision: "auto".to_string(),
             vision_provider: "gemini".to_string(),
+            text_quality_threshold: 0.2,
         }
     }
 }
@@ -92,6 +99,40 @@ pub fn get_store_path(app: &tauri::AppHandle) -> PathBuf {
         .join("settings.json")
 }
 
+fn resolve_env_vars(value: &str) -> String {
+    let mut result = value.to_string();
+    // Resolve ${VAR} patterns
+    let env_re = regex::Regex::new(r"\$\{(\w+)\}").unwrap();
+    let matches: Vec<String> = env_re
+        .find_iter(&result)
+        .map(|m| m.as_str().to_string())
+        .collect();
+    for mat in &matches {
+        let var_name = &mat[2..mat.len() - 1]; // strip ${ and }
+        if let Ok(val) = std::env::var(var_name) {
+            result = result.replace(mat, &val);
+        }
+    }
+    // Resolve $VAR patterns (word boundary)
+    let simple_re = regex::Regex::new(r"\$(\w+)").unwrap();
+    let simple_matches: Vec<String> = simple_re
+        .find_iter(&result)
+        .map(|m| m.as_str().to_string())
+        .collect();
+    for mat in &simple_matches {
+        let var_name = &mat[1..]; // strip $
+        if let Ok(val) = std::env::var(var_name) {
+            result = result.replace(mat, &val);
+        }
+    }
+    result
+}
+
+fn resolve_config_env_vars(config: &mut AppConfig) {
+    config.ai.api_key = resolve_env_vars(&config.ai.api_key);
+    config.ai.gemini_api_key = resolve_env_vars(&config.ai.gemini_api_key);
+}
+
 pub async fn load_config(app: tauri::AppHandle) -> Result<AppConfig, String> {
     let store_path = get_store_path(&app);
     if store_path.exists() {
@@ -99,12 +140,15 @@ pub async fn load_config(app: tauri::AppHandle) -> Result<AppConfig, String> {
             .await
             .map_err(|e| e.to_string())?;
         if let Some(saved) = store.get("config") {
-            if let Ok(cfg) = serde_json::from_value::<AppConfig>(saved) {
+            if let Ok(mut cfg) = serde_json::from_value::<AppConfig>(saved) {
+                resolve_config_env_vars(&mut cfg);
                 return Ok(cfg);
             }
         }
     }
-    Ok(AppConfig::default())
+    let mut cfg = AppConfig::default();
+    resolve_config_env_vars(&mut cfg);
+    Ok(cfg)
 }
 
 pub async fn save_config(
@@ -202,6 +246,10 @@ pub fn apply_config_update(
             match field {
                 "vision" => pdf.vision = value.to_string(),
                 "vision_provider" => pdf.vision_provider = value.to_string(),
+                "text_quality_threshold" => {
+                    pdf.text_quality_threshold =
+                        value.parse::<f64>().unwrap_or(pdf.text_quality_threshold);
+                }
                 _ => {
                     return Err(format!("Unknown PDF config field: {}", field));
                 }

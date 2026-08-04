@@ -1,6 +1,7 @@
 mod ai;
 mod config;
 mod document;
+mod extractors;
 mod file_utils;
 
 use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
@@ -240,17 +241,6 @@ fn undo_last_rename_cmd(
     document::undo_last_rename(&history_path, batch_id.as_deref().unwrap_or(""))
 }
 
-fn is_text_extension(path: &str) -> bool {
-    let ext = std::path::Path::new(path)
-        .extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-    matches!(
-        ext.as_str(),
-        "txt" | "csv" | "md" | "rtf" | "json" | "xml" | "html" | "htm"
-    )
-}
-
 #[tauri::command]
 async fn rename_pdfs(
     app: tauri::AppHandle,
@@ -317,17 +307,91 @@ async fn rename_pdfs(
             }
         };
 
-        let metadata = if is_text_extension(path) {
+        let use_vision = match config.pdf.vision.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => false, // auto: decide based on file type and text quality
+        };
+
+        let metadata = if extractors::is_image_extension(path) {
+            // Images always go through vision
+            match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config).await {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    tracing::warn!("AI vision extraction failed for {}: {}", path, e);
+                    None
+                }
+            }
+        } else if extractors::is_text_extension(path) {
+            // Pure text files: read as text, send to text AI
             let text = String::from_utf8_lossy(&file_bytes).to_string();
             match ai::extract_metadata_text(&text, &ai_config).await {
                 Ok(m) => Some(m),
                 Err(e) => {
-                    tracing::warn!("AI text extraction failed for {}: {}", path, e);
+                    tracing::warn!("AI text extraction failed for {}: {}", e, path);
                     None
                 }
             }
+        } else if extractors::is_office_extension(path) || extractors::is_pdf_extension(path) {
+            // DOCX/XLSX/PPTX/PDF: try local extraction first
+            match extractors::extract_text_from_file(path) {
+                Ok((text, quality, method)) => {
+                    tracing::info!(
+                        "Local extraction for {}: method={}, quality={:.2}",
+                        path,
+                        method,
+                        quality
+                    );
+                    if quality >= config.pdf.text_quality_threshold && !use_vision {
+                        // Good quality text, use text AI
+                        match ai::extract_metadata_text(&text, &ai_config).await {
+                            Ok(m) => Some(m),
+                            Err(e) => {
+                                tracing::warn!("AI text extraction failed for {}: {}", path, e);
+                                None
+                            }
+                        }
+                    } else {
+                        // Poor quality or vision forced, use vision AI
+                        match ai::extract_metadata_vision(
+                            &[(path.clone(), file_bytes.clone())],
+                            &ai_config,
+                        )
+                        .await
+                        {
+                            Ok(m) => Some(m),
+                            Err(e) => {
+                                tracing::warn!("AI vision extraction failed for {}: {}", path, e);
+                                // Fallback: try text extraction with whatever we got
+                                if !text.is_empty() {
+                                    match ai::extract_metadata_text(&text, &ai_config).await {
+                                        Ok(m) => Some(m),
+                                        Err(_) => None,
+                                    }
+                                } else {
+                                    None
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Local extraction failed for {}: {}", path, e);
+                    // Fallback: send raw bytes to vision
+                    match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config)
+                        .await
+                    {
+                        Ok(m) => Some(m),
+                        Err(e2) => {
+                            tracing::warn!("Vision fallback also failed for {}: {}", path, e2);
+                            None
+                        }
+                    }
+                }
+            }
         } else {
-            match ai::extract_metadata_vision(&[(path.clone(), file_bytes)], &ai_config).await {
+            // Unknown type: try vision
+            match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config).await {
                 Ok(m) => Some(m),
                 Err(e) => {
                     tracing::warn!("AI vision extraction failed for {}: {}", path, e);
@@ -379,12 +443,22 @@ async fn rename_pdfs(
             }
         };
 
-        if std::path::Path::new(path)
-            .canonicalize()
-            .ok()
-            .and_then(|p| p.to_string_lossy().to_string().into())
-            .as_ref()
-            == new_path.canonicalize().ok().as_ref().map(|p| p.to_string_lossy().to_string()).as_ref()
+        // No-op detection: if source path normalizes to same as target, skip
+        let src_normalized = std::path::Path::new(path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let dst_normalized = std::path::Path::new(&new_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if src_normalized == dst_normalized
+            && std::path::Path::new(path)
+                .parent()
+                .and_then(|p| p.canonicalize().ok())
+                == std::path::Path::new(&new_path)
+                    .parent()
+                    .and_then(|p| p.canonicalize().ok())
         {
             result.files.push(FileResult {
                 file: path.clone(),
