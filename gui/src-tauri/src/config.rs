@@ -1,39 +1,9 @@
+use crate::ai::AiConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::Manager;
 use tauri_plugin_store::Store;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct AiConfig {
-    pub provider: String,
-    pub api_key: String,
-    pub model: String,
-    pub gemini_model: String,
-    pub gemini_api_key: String,
-    pub gemini_base_url: String,
-    pub custom_model: String,
-    pub custom_base_url: String,
-    pub temperature: f64,
-    pub timeout: u64,
-}
-
-impl Default for AiConfig {
-    fn default() -> Self {
-        Self {
-            provider: "gemini".to_string(),
-            api_key: String::new(),
-            model: "gpt-4o-mini".to_string(),
-            gemini_model: "gemini-3.1-flash-lite".to_string(),
-            gemini_api_key: String::new(),
-            gemini_base_url: String::new(),
-            custom_model: String::new(),
-            custom_base_url: String::new(),
-            temperature: 0.0,
-            timeout: 30,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PdfConfig {
@@ -155,20 +125,51 @@ pub async fn save_config(
 
 pub async fn save_config_batch(
     app: tauri::AppHandle,
-    updates: Vec<(String, serde_json::Value)>,
-) -> Result<(), String> {
+    updates: Vec<(String, String)>,
+) -> Result<ConfigBatchResult, String> {
     let mut config = load_config(app.clone()).await?;
+    let mut saved = 0u32;
+    let mut failed = 0u32;
+    let mut errors = Vec::new();
+
     for (key, value) in updates {
-        apply_config_update(&mut config, &key, &value);
+        match apply_config_update(&mut config, &key, &value) {
+            Ok(()) => saved += 1,
+            Err(e) => {
+                failed += 1;
+                errors.push(e);
+            }
+        }
     }
-    save_config(app, &config).await?;
-    Ok(())
+
+    if saved > 0 {
+        save_config(app, &config).await?;
+    }
+
+    Ok(ConfigBatchResult {
+        success: failed == 0,
+        saved,
+        failed,
+        errors,
+    })
 }
 
-fn apply_config_update(config: &mut AppConfig, key: &str, value: &serde_json::Value) {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigBatchResult {
+    pub success: bool,
+    pub saved: u32,
+    pub failed: u32,
+    pub errors: Vec<String>,
+}
+
+pub fn apply_config_update(
+    config: &mut AppConfig,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
     let parts: Vec<&str> = key.splitn(2, '.').collect();
     if parts.len() != 2 {
-        return;
+        return Err(format!("Invalid config key format: {}", key));
     }
     let section = parts[0];
     let field = parts[1];
@@ -177,55 +178,83 @@ fn apply_config_update(config: &mut AppConfig, key: &str, value: &serde_json::Va
         "ai" => {
             let ai = &mut config.ai;
             match field {
-                "provider" => ai.provider = value.as_str().unwrap_or(&ai.provider).to_string(),
-                "api_key" => ai.api_key = value.as_str().unwrap_or(&ai.api_key).to_string(),
-                "model" => ai.model = value.as_str().unwrap_or(&ai.model).to_string(),
-                "gemini_model" => ai.gemini_model = value.as_str().unwrap_or(&ai.gemini_model).to_string(),
-                "gemini_api_key" => ai.gemini_api_key = value.as_str().unwrap_or(&ai.gemini_api_key).to_string(),
-                "gemini_base_url" => ai.gemini_base_url = value.as_str().unwrap_or(&ai.gemini_base_url).to_string(),
-                "custom_model" => ai.custom_model = value.as_str().unwrap_or(&ai.custom_model).to_string(),
-                "custom_base_url" => ai.custom_base_url = value.as_str().unwrap_or(&ai.custom_base_url).to_string(),
-                "temperature" => ai.temperature = value.as_f64().unwrap_or(ai.temperature),
-                "timeout" => ai.timeout = value.as_u64().unwrap_or(ai.timeout),
-                _ => {}
+                "provider" => ai.provider = value.to_string(),
+                "api_key" => ai.api_key = value.to_string(),
+                "model" => ai.model = value.to_string(),
+                "gemini_model" => ai.gemini_model = value.to_string(),
+                "gemini_api_key" => ai.gemini_api_key = value.to_string(),
+                "gemini_base_url" => ai.gemini_base_url = value.to_string(),
+                "custom_model" => ai.custom_model = value.to_string(),
+                "custom_base_url" => ai.custom_base_url = value.to_string(),
+                "temperature" => {
+                    ai.temperature = value.parse::<f64>().unwrap_or(ai.temperature);
+                }
+                "timeout" => {
+                    ai.timeout = value.parse::<u64>().unwrap_or(ai.timeout);
+                }
+                _ => {
+                    return Err(format!("Unknown AI config field: {}", field));
+                }
             }
         }
         "pdf" => {
             let pdf = &mut config.pdf;
             match field {
-                "vision" => pdf.vision = value.as_str().unwrap_or(&pdf.vision).to_string(),
-                "vision_provider" => pdf.vision_provider = value.as_str().unwrap_or(&pdf.vision_provider).to_string(),
-                _ => {}
+                "vision" => pdf.vision = value.to_string(),
+                "vision_provider" => pdf.vision_provider = value.to_string(),
+                _ => {
+                    return Err(format!("Unknown PDF config field: {}", field));
+                }
             }
         }
         "naming" => {
             let naming = &mut config.naming;
             match field {
-                "template" => naming.template = value.as_str().unwrap_or(&naming.template).to_string(),
-                "fallback" => naming.fallback = value.as_str().unwrap_or(&naming.fallback).to_string(),
-                "date_format" => naming.date_format = value.as_str().unwrap_or(&naming.date_format).to_string(),
-                "separator" => naming.separator = value.as_str().unwrap_or(&naming.separator).to_string(),
-                "max_length" => naming.max_length = value.as_u64().unwrap_or(naming.max_length as u64) as u32,
-                "sequence_zerofill" => naming.sequence_zerofill = value.as_u64().unwrap_or(naming.sequence_zerofill as u64) as u32,
-                _ => {}
+                "template" => naming.template = value.to_string(),
+                "fallback" => naming.fallback = value.to_string(),
+                "date_format" => naming.date_format = value.to_string(),
+                "separator" => naming.separator = value.to_string(),
+                "max_length" => {
+                    naming.max_length = value.parse::<u32>().unwrap_or(naming.max_length);
+                }
+                "sequence_zerofill" => {
+                    naming.sequence_zerofill =
+                        value.parse::<u32>().unwrap_or(naming.sequence_zerofill);
+                }
+                _ => {
+                    return Err(format!("Unknown naming config field: {}", field));
+                }
             }
         }
         "undo" => {
             let undo = &mut config.undo;
             match field {
-                "enabled" => undo.enabled = value.as_bool().unwrap_or(undo.enabled),
-                "log_path" => undo.log_path = value.as_str().unwrap_or(&undo.log_path).to_string(),
-                "max_entries" => undo.max_entries = value.as_u64().unwrap_or(undo.max_entries as u64) as u32,
-                _ => {}
+                "enabled" => {
+                    undo.enabled = value == "true";
+                }
+                "log_path" => undo.log_path = value.to_string(),
+                "max_entries" => {
+                    undo.max_entries = value.parse::<u32>().unwrap_or(undo.max_entries);
+                }
+                _ => {
+                    return Err(format!("Unknown undo config field: {}", field));
+                }
             }
         }
-        "_general" => {
-            match field {
-                "debug" => config.debug = value.as_bool().unwrap_or(config.debug),
-                "max_workers" => config.max_workers = value.as_u64().unwrap_or(config.max_workers as u64) as u32,
-                _ => {}
+        "_general" => match field {
+            "debug" => {
+                config.debug = value == "true";
             }
+            "max_workers" => {
+                config.max_workers = value.parse::<u32>().unwrap_or(config.max_workers);
+            }
+            _ => {
+                return Err(format!("Unknown general config field: {}", field));
+            }
+        },
+        _ => {
+            return Err(format!("Unknown config section: {}", section));
         }
-        _ => {}
     }
+    Ok(())
 }

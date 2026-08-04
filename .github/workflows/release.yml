@@ -10,43 +10,15 @@ permissions:
   contents: write
 
 env:
-  PYTHON_VERSION: "3.12"
   NODE_VERSION: "22"
   PNPM_VERSION: "9.15.0"
 
 jobs:
   # ────────────────────────────────────────────────────────────
-  # TEST
-  # ────────────────────────────────────────────────────────────
-  test:
-    name: Test (Python ${{ matrix.python-version }})
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12", "3.13"]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-          cache-dependency-path: "requirements*.txt"
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-      - name: Run tests
-        run: python -m pytest tests/ -v --tb=short --cov=autorename_revived
-
-  # ────────────────────────────────────────────────────────────
-  # BUILD GUI PORTABLE (native Rust Tauri app, no CLI sidecar)
+  # BUILD GUI PORTABLE (native Rust Tauri app)
   # ────────────────────────────────────────────────────────────
   build-gui-portable:
     name: Build GUI Portable
-    needs: [test]
     if: github.event_name != 'pull_request'
     runs-on: windows-latest
     steps:
@@ -58,10 +30,10 @@ jobs:
           if ("${{ github.ref }}" -match "^refs/tags/v") {
             $v = "${{ github.ref_name }}" -replace "^v", ""
           } else {
-            $verFile = "autorename_revived\_version.py"
-            if (Test-Path $verFile) {
-              $content = Get-Content $verFile -Raw
-              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            $cargoToml = "gui\src-tauri\Cargo.toml"
+            if (Test-Path $cargoToml) {
+              $content = Get-Content $cargoToml -Raw
+              if ($content -match 'version\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
             } else { $v = "0.0.0" }
           }
           "version=$v" >> $env:GITHUB_OUTPUT
@@ -92,7 +64,7 @@ jobs:
           key: pnpm-${{ hashFiles('gui/pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-
-      - name: Build Tauri GUI (portable, no bundles)
+      - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: gui
         run: |
@@ -109,7 +81,7 @@ jobs:
           $peVer = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
           $v = "$($peVer.FileMajorPart).$($peVer.FileMinorPart).$($peVer.FileBuildPart)"
           Write-Output "PASS: GUI v$v ($([math]::Round($size/1MB,1)) MB)"
-      - name: Create portable ZIP (GUI only, no CLI sidecar)
+      - name: Create portable ZIP (GUI only)
         shell: pwsh
         run: |
           $v = "${{ steps.version.outputs.version }}"
@@ -129,7 +101,6 @@ jobs:
   # ────────────────────────────────────────────────────────────
   build-gui-installer:
     name: Build GUI Installer
-    needs: [test]
     if: github.event_name != 'pull_request'
     runs-on: windows-latest
     steps:
@@ -141,10 +112,10 @@ jobs:
           if ("${{ github.ref }}" -match "^refs/tags/v") {
             $v = "${{ github.ref_name }}" -replace "^v", ""
           } else {
-            $verFile = "autorename_revived\_version.py"
-            if (Test-Path $verFile) {
-              $content = Get-Content $verFile -Raw
-              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            $cargoToml = "gui\src-tauri\Cargo.toml"
+            if (Test-Path $cargoToml) {
+              $content = Get-Content $cargoToml -Raw
+              if ($content -match 'version\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
             } else { $v = "0.0.0" }
           }
           "version=$v" >> $env:GITHUB_OUTPUT
@@ -203,10 +174,10 @@ jobs:
           if ("${{ github.ref }}" -match "^refs/tags/v") {
             $v = "${{ github.ref_name }}" -replace "^v", ""
           } else {
-            $verFile = "autorename_revived\_version.py"
-            if (Test-Path $verFile) {
-              $content = Get-Content $verFile -Raw
-              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            $cargoToml = "gui\src-tauri\Cargo.toml"
+            if (Test-Path $cargoToml) {
+              $content = Get-Content $cargoToml -Raw
+              if ($content -match 'version\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
             } else { $v = "0.0.0" }
           }
           "version=$v" >> $env:GITHUB_OUTPUT

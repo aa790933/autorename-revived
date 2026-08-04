@@ -26,12 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const errors = validation.issues.filter((i) => i.level === 'error');
       if (errors.length > 0) setState({ statusError: 'Config error' });
     }
-  }).catch((err) => {
-    const errStr = String(err);
-    if (errStr.includes('sidecar') || errStr.includes('not found') || errStr.includes('binaries')) {
-      setState({ statusError: 'CLI not found' });
-    } else {
-      setState({ statusError: 'Config error' });
-    }
+  }).catch(() => {
+    setState({ statusError: 'Config error' });
   });
 });

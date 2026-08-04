@@ -4,7 +4,7 @@ mod document;
 mod file_utils;
 
 use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
-use config::{AppConfig, load_config, save_config, save_config_batch};
+use config::{AppConfig, ConfigBatchResult, load_config, save_config, save_config_batch};
 use document::{BatchResult, FileResult, UndoResult};
 use file_utils::{
     copy_file, ensure_directory, file_exists, get_file_extension, get_file_name, get_file_size,
@@ -12,8 +12,9 @@ use file_utils::{
     preserve_extension, read_file_to_base64, read_file_to_bytes, recursive_find_files,
     resolve_safe_path, validate_supported_extension,
 };
-use chrono;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -57,7 +58,7 @@ pub fn run() {
             get_config,
             get_config_path,
             validate_config,
-            save_config,
+            save_config_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -83,12 +84,19 @@ async fn save_app_config(app: tauri::AppHandle, config: AppConfig) -> Result<(),
     save_config(app, &config).await
 }
 
+#[derive(Debug, Deserialize)]
+struct ConfigUpdate {
+    key: String,
+    value: String,
+}
+
 #[tauri::command]
 async fn save_app_config_batch(
     app: tauri::AppHandle,
-    updates: Vec<(String, Value)>,
-) -> Result<(), String> {
-    save_config_batch(app, updates).await
+    updates: Vec<ConfigUpdate>,
+) -> Result<ConfigBatchResult, String> {
+    let pairs: Vec<(String, String)> = updates.into_iter().map(|u| (u.key, u.value)).collect();
+    save_config_batch(app, pairs).await
 }
 
 #[tauri::command]
@@ -232,12 +240,44 @@ fn undo_last_rename_cmd(
     document::undo_last_rename(&history_path, batch_id.as_deref().unwrap_or(""))
 }
 
+fn is_text_extension(path: &str) -> bool {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    matches!(
+        ext.as_str(),
+        "txt" | "csv" | "md" | "rtf" | "json" | "xml" | "html" | "htm"
+    )
+}
+
 #[tauri::command]
 async fn rename_pdfs(
+    app: tauri::AppHandle,
     paths: Vec<String>,
     options: serde_json::Value,
 ) -> Result<BatchResult, String> {
-    let dry_run = options.get("dryRun").and_then(|v| v.as_bool()).unwrap_or(false);
+    let dry_run = options
+        .get("dryRun")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let provider_override = options
+        .get("provider")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let config = load_config(app.clone()).await?;
+
+    let mut ai_config = config.ai.clone();
+    if let Some(ref prov) = provider_override {
+        ai_config.provider = prov.clone();
+    }
+
+    let batch_id = format!(
+        "gui-{}",
+        chrono::Local::now().format("%Y%m%dT%H%M%S")
+    );
+
     let mut result = BatchResult {
         success: true,
         total: paths.len(),
@@ -246,31 +286,25 @@ async fn rename_pdfs(
         failed: 0,
         files: Vec::new(),
         dry_run,
-        batch_id: Some(format!("gui-{}", chrono::Local::now().format("%Y%m%dT%H%M%S"))),
+        batch_id: Some(batch_id.clone()),
     };
 
     for path in &paths {
         let file_name = file_utils::get_file_name(path);
-        let new_name = document::generate_filename(
-            "",
-            &file_utils::get_file_extension(path),
-            "",
-            &config::NamingConfig::default(),
-            path,
-        );
-        let new_path = resolve_safe_path(
-            &std::path::Path::new(path).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
-            &new_name,
-        )?;
+        let parent_dir = std::path::Path::new(path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
 
-        if !dry_run {
-            if let Err(e) = document::apply_rename(path, &new_path, false) {
+        let file_bytes = match std::fs::read(path) {
+            Ok(b) => b,
+            Err(e) => {
                 result.files.push(FileResult {
                     file: path.clone(),
                     status: "failed".to_string(),
                     new_name: None,
                     new_path: None,
-                    error: Some(e),
+                    error: Some(format!("Failed to read file: {}", e)),
                     warnings: vec![],
                     company: None,
                     date: None,
@@ -281,50 +315,216 @@ async fn rename_pdfs(
                 result.failed += 1;
                 continue;
             }
+        };
+
+        let metadata = if is_text_extension(path) {
+            let text = String::from_utf8_lossy(&file_bytes).to_string();
+            match ai::extract_metadata_text(&text, &ai_config).await {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    tracing::warn!("AI text extraction failed for {}: {}", path, e);
+                    None
+                }
+            }
+        } else {
+            match ai::extract_metadata_vision(&[(path.clone(), file_bytes)], &ai_config).await {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    tracing::warn!("AI vision extraction failed for {}: {}", path, e);
+                    None
+                }
+            }
+        };
+
+        let meta = metadata.unwrap_or_default();
+        let company = document::harmonize_company_name(
+            &meta.company_name,
+            &config.harmonized_companies,
+        );
+        let date = document::parse_document_date(&meta.document_date).unwrap_or_default();
+
+        let new_name = document::generate_filename(
+            &company,
+            &meta.document_type,
+            &date,
+            &config.naming,
+            path,
+        );
+
+        let ext = file_utils::get_file_extension(path);
+        let final_name = if !ext.is_empty() && !new_name.ends_with(&format!(".{}", ext)) {
+            format!("{}.{}", new_name, ext)
+        } else {
+            new_name.clone()
+        };
+
+        let new_path = match resolve_safe_path(&parent_dir, &final_name) {
+            Ok(p) => p,
+            Err(e) => {
+                result.files.push(FileResult {
+                    file: path.clone(),
+                    status: "failed".to_string(),
+                    new_name: Some(final_name),
+                    new_path: None,
+                    error: Some(e),
+                    warnings: vec![],
+                    company: Some(company.clone()),
+                    date: Some(date.clone()),
+                    doc_type: Some(meta.document_type.clone()),
+                    provider: Some(ai_config.provider.clone()),
+                    model: None,
+                });
+                result.failed += 1;
+                continue;
+            }
+        };
+
+        if std::path::Path::new(path)
+            .canonicalize()
+            .ok()
+            .and_then(|p| p.to_string_lossy().to_string().into())
+            .as_ref()
+            == new_path.canonicalize().ok().as_ref().map(|p| p.to_string_lossy().to_string()).as_ref()
+        {
+            result.files.push(FileResult {
+                file: path.clone(),
+                status: "skipped".to_string(),
+                new_name: Some(final_name),
+                new_path: Some(new_path.clone()),
+                error: None,
+                warnings: vec!["Already matches target name".to_string()],
+                company: Some(company.clone()),
+                date: Some(date.clone()),
+                doc_type: Some(meta.document_type.clone()),
+                provider: Some(ai_config.provider.clone()),
+                model: None,
+            });
+            result.skipped += 1;
+            continue;
+        }
+
+        if !dry_run {
+            if let Err(e) = document::apply_rename(path, &new_path, false) {
+                result.files.push(FileResult {
+                    file: path.clone(),
+                    status: "failed".to_string(),
+                    new_name: Some(final_name),
+                    new_path: Some(new_path),
+                    error: Some(e),
+                    warnings: vec![],
+                    company: Some(company.clone()),
+                    date: Some(date.clone()),
+                    doc_type: Some(meta.document_type.clone()),
+                    provider: Some(ai_config.provider.clone()),
+                    model: None,
+                });
+                result.failed += 1;
+                continue;
+            }
+
+            if config.undo.enabled {
+                let history_path = app
+                    .path()
+                    .app_data_dir()
+                    .expect("Failed to get app data dir")
+                    .join("rename_history.json");
+                if let Err(e) = document::save_rename_to_history(path, &new_path, &history_path, &batch_id) {
+                    tracing::warn!("Failed to save undo history: {}", e);
+                }
+            }
         }
 
         result.files.push(FileResult {
             file: path.clone(),
             status: "renamed".to_string(),
-            new_name: Some(new_name),
+            new_name: Some(final_name),
             new_path: Some(new_path),
             error: None,
             warnings: vec![],
-            company: None,
-            date: None,
-            doc_type: None,
-            provider: None,
+            company: Some(company),
+            date: Some(date),
+            doc_type: Some(meta.document_type),
+            provider: Some(ai_config.provider.clone()),
             model: None,
         });
         result.renamed += 1;
     }
 
+    result.success = result.failed == 0;
     Ok(result)
 }
 
 #[tauri::command]
-async fn undo_rename(batch_id: Option<String>) -> Result<UndoResult, String> {
-    // This requires the app handle to get the history path
-    // Stub implementation - use the last batch if no batch_id provided
-    Err("Undo rename requires app context".to_string())
+async fn undo_rename(
+    app: tauri::AppHandle,
+    batch_id: Option<String>,
+) -> Result<UndoResult, String> {
+    let history_path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("rename_history.json");
+    document::undo_last_rename(&history_path, batch_id.as_deref().unwrap_or(""))
 }
 
 #[tauri::command]
-async fn get_config() -> Result<serde_json::Value, String> {
-    Ok(serde_json::json!({}))
+async fn get_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let config = load_config(app).await?;
+    serde_json::to_value(config).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn get_config_path() -> Result<String, String> {
-    Err("Config path not available".to_string())
+async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
+    let path = config::get_store_path(&app);
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-async fn validate_config() -> Result<serde_json::Value, String> {
-    Ok(serde_json::json!({"valid": true, "issues": []}))
+async fn validate_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let config = load_config(app).await?;
+    let mut issues: Vec<serde_json::Value> = Vec::new();
+
+    if config.ai.provider.is_empty() {
+        issues.push(serde_json::json!({
+            "field": "ai.provider",
+            "level": "error",
+            "message": "AI provider is required"
+        }));
+    }
+
+    let has_key = match config.ai.provider.as_str() {
+        "gemini" => !config.ai.gemini_api_key.is_empty(),
+        "openai" => !config.ai.api_key.is_empty(),
+        "anthropic" => !config.ai.api_key.is_empty(),
+        "ollama" => true,
+        "xai" => !config.ai.api_key.is_empty(),
+        "custom" => true,
+        _ => false,
+    };
+    if !has_key {
+        issues.push(serde_json::json!({
+            "field": "ai.api_key",
+            "level": "warning",
+            "message": "No API key configured for selected provider"
+        }));
+    }
+
+    let valid = issues.iter().all(|i| i["level"] != "error");
+
+    Ok(serde_json::json!({
+        "valid": valid,
+        "issues": issues
+    }))
 }
 
 #[tauri::command]
-async fn save_config(key: String, value: String) -> Result<serde_json::Value, String> {
+async fn save_config_cmd(
+    app: tauri::AppHandle,
+    key: String,
+    value: String,
+) -> Result<serde_json::Value, String> {
+    let mut cfg = load_config(app.clone()).await?;
+    config::apply_config_update(&mut cfg, &key, &value).map_err(|e| e.to_string())?;
+    save_config(app, &cfg).await?;
     Ok(serde_json::json!({"success": true}))
 }

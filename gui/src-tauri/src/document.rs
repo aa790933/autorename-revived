@@ -431,65 +431,6 @@ pub fn undo_last_rename(
         }
     };
 
-            old_path: Path::new(old_path).to_string_lossy().to_string(),
-            new_path: Path::new(new_path).to_string_lossy().to_string(),
-            timestamp: timestamp.clone(),
-        }],
-    });
-    while history.batches.len() > 100 {
-        history.batches.remove(0);
-    }
-
-    history.save(history_path)?;
-    Ok(())
-}
-
-pub fn undo_last_rename(
-    history_path: &Path,
-    batch_id: &str,
-) -> Result<UndoResult, String> {
-    let mut history = UndoHistory::load(history_path)?;
-    let batches = &mut history.batches;
-
-    if batches.is_empty() {
-        return Ok(UndoResult {
-            success: false,
-            restored: 0,
-            failed: 0,
-            files: Vec::new(),
-            batch_id: None,
-        });
-    }
-
-    let (batch_idx, file_idx) = if !batch_id.is_empty() {
-        batches.iter().rposition(|b| b.batch_id == batch_id && !b.undone).and_then(|bi| {
-            let fi = batches[bi].files.len().saturating_sub(1);
-            if fi < batches[bi].files.len() {
-                Some((bi, fi))
-            } else {
-                None
-            }
-        })
-    } else {
-        batches.iter().rposition(|b| !b.undone && !b.files.is_empty()).and_then(|bi| {
-            let fi = batches[bi].files.len().saturating_sub(1);
-            Some((bi, fi))
-        })
-    };
-
-    let (bi, fi) = match (batch_idx, file_idx) {
-        (Some(b), Some(f)) => (b, f),
-        _ => {
-            return Ok(UndoResult {
-                success: false,
-                restored: 0,
-                failed: 0,
-                files: Vec::new(),
-                batch_id: None,
-            });
-        }
-    };
-
     let entry = batches[bi].files[fi].clone();
 
     if !Path::new(&entry.new_path).exists() {

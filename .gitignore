@@ -1,19 +1,3 @@
-# Python
-__pycache__/
-autorename_revived/__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-dist/
-build/
-*.spec
-*.egg
-setup.iss
-
-# Virtual environment
-venv/
-.venv/
-
 # IDE
 .vscode/
 .idea/
@@ -23,10 +7,6 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
-
-# Config (user-specific, contains API keys)
-config.yaml
-harmonized-company-names.yaml
 
 # Environment
 .env
@@ -43,6 +23,5 @@ gui/src-tauri/binaries/
 Releases/
 *.zip
 
-# pytest
-.pytest_cache/
-.coverage
+# Rust
+gui/src-tauri/target/
