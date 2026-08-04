@@ -136,12 +136,12 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
         return "_".to_string();
     }
 
-    let invalid_fs_chars = Regex::new(r'[\x00-\x1f\\/:*?"<>|]').unwrap();
-    let unicode_control = Regex::new(r'[\u200b-\u200f\u2028-\u202f\u2060-\u2064\ufeff\u00ad]').unwrap();
-    let gibberish_hex = Regex::new(r'\b[0-9a-f]{8,}\b').unwrap();
-    let gibberish_long_num = Regex::new(r'\b\d{6,}\b').unwrap();
-    let leading_trailing = Regex::new(r'^[\W_]+|[\W_]+$').unwrap();
-    let multi_sep = Regex::new(r'[_ \-]{2,}').unwrap();
+    let invalid_fs_chars = Regex::new(r"[\x00-\x1f\\/:*?\"<>|]").unwrap();
+    let unicode_control = Regex::new(r"[\u200b-\u200f\u2028-\u202f\u2060-\u2064\ufeff\u00ad]").unwrap();
+    let gibberish_hex = Regex::new(r"\b[0-9a-f]{8,}\b").unwrap();
+    let gibberish_long_num = Regex::new(r"\b\d{6,}\b").unwrap();
+    let leading_trailing = Regex::new(r"^[\W_]+|[\W_]+$").unwrap();
+    let multi_sep = Regex::new(r"[_ \-]{2,}").unwrap();
 
     let reserved_names = [
         "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6",
