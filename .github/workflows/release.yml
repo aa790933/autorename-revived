@@ -75,6 +75,10 @@ jobs:
           pnpm run colors
           pnpm run build:css
           pnpm run build
+      - name: Clean stale Rust artifacts
+        shell: pwsh
+        working-directory: src-tauri
+        run: cargo clean
       - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: src-tauri
@@ -164,6 +168,10 @@ jobs:
           pnpm run colors
           pnpm run build:css
           pnpm run build
+      - name: Clean stale Rust artifacts
+        shell: pwsh
+        working-directory: src-tauri
+        run: cargo clean
       - name: Build Tauri MSI
         shell: pwsh
         working-directory: src-tauri
