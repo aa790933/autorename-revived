@@ -11,17 +11,17 @@ Thumbs.db
 # Environment
 .env
 
-# GUI
+# GUI (frontend)
 gui/node_modules/
-gui/src-tauri/target/
-gui/src-tauri/gen/schemas/
+gui/dist/
 gui/src/css/generated-colors.css
 gui/package-lock.json
-gui/src-tauri/binaries/
+
+# Backend (Rust/Tauri)
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/binaries/
 
 # CI artifact directories
 Releases/
 *.zip
-
-# Rust
-gui/src-tauri/target/

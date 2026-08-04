@@ -1,34 +1,36 @@
 <div align="center">
   <h1>AutoRename-Revived v3.0.4</h1>
-  <p><b>AI-powered batch document renamer — OCR, multi-provider LLM, modern GUI, and zero-latency threading.</b></p>
+  <p><b>AI-powered batch document renamer — native Rust backend, multi-provider LLM, and modern Tauri GUI.</b></p>
   <p>
-    <img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python" alt="Python 3.11+">
+    <img src="https://img.shields.io/badge/rust-2021-orange?logo=rust" alt="Rust">
     <img src="https://img.shields.io/badge/platform-Windows-blue?logo=windows" alt="Windows">
     <img src="https://img.shields.io/github/license/aa790933/autorename-revived" alt="MIT">
   </p>
 </div>
 
-AutoRename-Revived extracts **company name**, **document date**, and **document type** from documents (PDF, images, DOCX, XLSX) using AI, then renames them to a consistent `YYYYMMDD_COMPANY_DOCTYPE` format — batch processing hundreds of files in seconds.
+AutoRename-Revived extracts **company name**, **document date**, and **document type** from documents (PDF, images, DOCX, XLSX, PPTX) using AI, then renames them to a consistent `YYYYMMDD_COMPANY_DOCTYPE` format — batch processing hundreds of files in seconds.
 
 ---
 
 ## Features
 
-- **5 AI Providers** — OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), and Ollama for fully offline use
-- **Cloud-Native Vision** — Images and scanned PDFs analyzed via Vision LLMs (OpenAI, Gemini, Anthropic, Custom); no local OCR dependency
-- **Multithreaded Processing** — Parallel batch via `ThreadPoolExecutor` with zero UI freezing; drag-and-drop runs on daemon threads
-- **AI Sanitization** — Regex-based cleaning strips markdown fences, code blocks, and LLM gibberish before filenames reach the filesystem
-- **API Test Connection** — One-click provider verification in both GUI and CLI (`config test-connection`)
-- **Company Harmonization** — Fuzzy matching (Jaro-Winkler via rapidfuzz) maps OCR typos to canonical names
-- **Modern GUI** — Tauri v2 desktop app (TypeScript + Rust) with Catppuccin theme, drag-and-drop, and one-click rename
-- **Portable & Installer** — Standalone `--onefile` EXE or Inno Setup installer; context menu integration via `setup.ps1`
-- **Privacy-First** — Run fully offline with Ollama; no data leaves your machine
+- **Pure Rust Backend** — No Python runtime required; native AI provider routing via `reqwest` + `tokio`
+- **5 AI Providers** — Google Gemini (default), OpenAI, Anthropic, xAI (Grok), and Ollama for offline use
+- **Cloud-Native Vision** — Images and scanned PDFs analyzed via Vision LLMs; no local OCR dependency
+- **Local Text Extraction** — DOCX, XLSX, PPTX, and PDF text extraction via `lopdf` + ZIP parsing
+- **Async IPC** — Non-blocking background threads for file reading, Base64 encoding, and API calls
+- **AI Sanitization** — Regex-based cleaning strips markdown fences, code blocks, and LLM gibberish
+- **API Test Connection** — One-click provider verification in Settings (tests only the active provider)
+- **Company Harmonization** — Fuzzy matching maps OCR typos to canonical names
+- **Modern GUI** — Tauri v2 desktop app (TypeScript + Rust) with Catppuccin theme, drag-and-drop
+- **Embedded State** — Settings stored in-memory via `tauri-plugin-store`; zero external config files
+- **Portable & Installer** — Standalone EXE or MSI installer
 
 ## Quick Start
 
 ### GUI (Recommended)
 
-Download the [latest release](https://github.com/aa790933/autorename-revived/releases) and run `AutoRename-v3.0.4-Portable.exe` — no installation required.
+Download the [latest release](https://github.com/aa790933/autorename-revived/releases) and run `AutoRename-Revived.exe` — no installation required.
 
 - Drag & drop PDF files or folders onto the window
 - Preview proposed names with the **Dry Run** button
@@ -36,123 +38,136 @@ Download the [latest release](https://github.com/aa790933/autorename-revived/rel
 - **Test Connection** in Settings verifies your AI provider is reachable
 - Theme: Catppuccin Macchiato (dark) / Latte (light)
 
-### CLI
+### Development
 
 ```bash
-# Set up
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-
-# Rename files
-python cli.py rename "C:\path\to\file.pdf"
-
-# Preview only
-python cli.py rename --dry-run "C:\path\to\folder"
-
-# Undo last rename
-python cli.py undo
-
-# Test API connection
-python cli.py config test-connection
-
-# Validate config
-python cli.py config save ai.model "gpt-4o-mini"
-python cli.py config save vision.gemini.api_key "your-key-here"
-python cli.py config validate
-python cli.py config show
-```
-
-## Configuration
-
-See [`config.yaml.example`](config.yaml.example) for the complete reference.
-
-### Extraction Modes
-
-| Setting | Values | Description |
-|---------|--------|-------------|
-| `pdf.vision` | `false` / `true` / `"auto"` | Send page images to Vision LLM (~$0.0001/page) |
-| `pdf.text_quality_threshold` | `0.0`–`1.0` | Triggers vision in `"auto"` mode |
-| `pdf.max_pages` | integer | Max pages processed per PDF |
-
-In `"auto"` mode, vision activates only when pdfplumber's text quality drops below the threshold.
-
-### Environment Variables
-
-Config values support `${VAR_NAME}` syntax. A `.env` file next to `config.yaml` is loaded automatically via `python-dotenv`.
-
-```env
-OPENAI_API_KEY=sk-your-key-here
-ANTHROPIC_API_KEY=sk-ant-your-key-here
+# Prerequisites: Rust toolchain, Node.js 22+, pnpm
+cd gui
+pnpm install
+pnpm tauri dev
 ```
 
 ## Project Structure
 
 ```
 autorename-revived/
-├── cli.py                          # CLI entry point (argparse: rename, undo, config save/validate/test-connection)
-├── autorename_revived/
-│   ├── __init__.py                 # Version + public API exports
-│   ├── _ai_processing.py           # Multi-provider AI extraction (test_api_connection with model param)
-│   ├── _config_loader.py           # YAML config with ${VAR} substitution + save_config
-│   ├── _document_extractor.py      # PdfExtractor / ImageExtractor / DocxExtractor / XlsxExtractor / PptxExtractor / CsvExtractor / TxtExtractor
-│   ├── _document_processing.py     # Harmonization, rename, undo history
-│   ├── _naming_engine.py           # Template-based filename generation
-│   ├── _path_safety.py             # Sanitization, traversal guards, Windows reserved names
-│   ├── _pdf_utils.py               # PDF text + image extraction (pdfplumber, pypdfium2 page rendering)
-│   ├── _resources.py               # PyInstaller resource resolution
-│   └── _utils.py                   # Exit codes, validation constants
-├── gui/                            # Tauri v2 desktop app
-│   ├── src/                        # TypeScript frontend (settings.ts, files.ts, renderer.ts)
-│   │   ├── lib/                    # sidecar.ts (Tauri bridge), dnd.ts, filepicker.ts, renderer.ts
-│   │   ├── views/                  # settings.ts (editable form), about.ts, files.ts
+├── gui/                            # Frontend (TypeScript + Vite)
+│   ├── src/
+│   │   ├── main.ts                 # App entry point
+│   │   ├── renderer.ts             # View router + status bar
+│   │   ├── lib/
+│   │   │   ├── config-store.ts     # In-memory config CRUD
+│   │   │   ├── sidecar.ts          # IPC wrappers (invoke Rust commands)
+│   │   │   ├── state.ts            # Pub/sub app state
+│   │   │   ├── dnd.ts              # Drag-and-drop
+│   │   │   ├── filepicker.ts       # File/folder picker dialogs
+│   │   │   ├── rename-cache.ts     # Dry-run cache apply via Tauri FS
+│   │   │   ├── theme.ts            # Dark/light toggle
+│   │   │   ├── titlebar.ts         # Custom window controls
+│   │   │   ├── toast.ts            # Toast notifications
+│   │   │   └── utils.ts            # Supported extensions, escapeHtml
+│   │   ├── views/
+│   │   │   ├── files.ts            # Main file list + rename pipeline
+│   │   │   ├── settings.ts         # Settings form + provider switcher
+│   │   │   └── about.ts            # About page
 │   │   └── css/                    # Catppuccin theme, component styles
-│   ├── src-tauri/                  # Rust backend + CLI sidecar integration
-│   │   ├── src/lib.rs              # Tauri entry (--version argv handler, get_version invoke)
-│   │   └── binaries/               # Bundled CLI sidecar (autorename-revived-cli-x86_64-pc-windows-msvc.exe)
-│   └── package.json                # Version 3.0.4, Node dependencies (pnpm)
-├── tests/
-│   └── test_suite.py               # 141 tests (pytest, --run-live for integration)
-├── build.py                        # Triple-target build orchestrator (CLI sidecar, onedir, Tauri)
-├── setup.ps1                       # Context menu installer
-└── .github/workflows/release.yml   # CI/CD: test → build → verify → release (3 artifacts)
+│   ├── public/                     # Static assets
+│   ├── scripts/                    # Build scripts (colors, icons)
+│   ├── package.json                # v3.0.4, pnpm dependencies
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   └── index.html
+│
+├── src-tauri/                      # Backend (Rust + Tauri v2)
+│   ├── src/
+│   │   ├── main.rs                 # Tauri entry point
+│   │   ├── lib.rs                  # IPC command bindings (32 commands)
+│   │   ├── ai.rs                   # AI provider routing (Gemini, OpenAI, Anthropic, Ollama, xAI, Custom)
+│   │   ├── config.rs               # AppConfig model, tauri-plugin-store persistence, env var resolution
+│   │   ├── document.rs             # Filename generation, undo history, path safety
+│   │   ├── extractors.rs           # Local text extraction (DOCX, XLSX, PPTX, PDF), text quality scoring
+│   │   └── file_utils.rs           # File system utilities
+│   ├── capabilities/               # Tauri permissions
+│   ├── icons/                      # App icons
+│   ├── Cargo.toml                  # Rust dependencies
+│   ├── tauri.conf.json             # Tauri build config
+│   └── build.rs
+│
+├── .github/workflows/release.yml   # CI/CD: build → verify → release
+├── .gitignore
+├── LICENSE
+├── README.md
+└── metadata.json                   # Code signing config
+```
+
+## AI Providers
+
+| Provider | Text Model | Vision Model | API Key |
+|----------|-----------|-------------|---------|
+| **Google Gemini** (default) | `gemini-3.1-flash-lite` | `gemini-3.1-flash-lite` | `ai.gemini_api_key` |
+| OpenAI | `gpt-4o-mini` | `gpt-4o` | `ai.api_key` |
+| Anthropic | `claude-3-5-haiku-latest` | `claude-sonnet-4-20250514` | `ai.api_key` |
+| Ollama | `llama3.2` | `llama3.2` | None |
+| xAI | `grok-3-beta` | `grok-3-beta` | `ai.api_key` |
+| Custom | User-defined | User-defined | User-defined |
+
+### Extraction Modes
+
+| Setting | Values | Description |
+|---------|--------|-------------|
+| `pdf.vision` | `false` / `true` / `"auto"` | Send file images to Vision LLM |
+| `pdf.text_quality_threshold` | `0.0`–`1.0` | Triggers vision in `"auto"` mode |
+
+In `"auto"` mode, local text extraction runs first. If quality is above the threshold, the text AI is used (cheaper). If below, vision AI is used (more accurate for scanned documents).
+
+### Environment Variables
+
+Config values support `${VAR_NAME}` syntax for API keys:
+
+```env
+GEMINI_API_KEY=your-key-here
+OPENAI_API_KEY=sk-your-key-here
 ```
 
 ## Building
 
-Releases are **CI-built only** — push a `v*` tag to trigger `.github/workflows/release.yml`:
+### CI/CD
+
+Push a `v*` tag to trigger `.github/workflows/release.yml`:
 
 ```bash
-python build.py    # Builds all three targets: CLI sidecar, onedir, Tauri GUI
+git tag v3.0.5
+git push origin v3.0.5
 ```
 
-> **Note**: Local builds require Rust toolchain (for Tauri), pnpm/Node.js (for GUI assets), and all Python dependencies installed in `venv/`. CI handles full builds automatically.
+This produces:
+- `AutoRename-v3.0.5-Portable.zip` — Standalone EXE
+- `*.msi` — Windows installer
 
-## Testing
+### Local Build
 
 ```bash
-pytest tests/ -v --cov
+# Prerequisites: Rust toolchain, Node.js 22+, pnpm
+cd gui
+pnpm install
+pnpm tauri build
 ```
 
-Live integration tests (require API keys in `.env`):
+## IPC Commands
 
-```bash
-pytest tests/ --run-live -v
-pytest tests/ --run-live --provider ollama -v
-```
+The frontend communicates with the Rust backend via 32 Tauri IPC commands:
 
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Error |
-| 2 | Usage error |
-| 3 | Configuration error |
-| 4 | No files found |
-| 5 | Partial failure |
-| 10 | AI provider error |
-| 11 | Authentication error |
+| Command | Purpose |
+|---------|---------|
+| `load_app_config` / `save_app_config` | Config persistence via tauri-plugin-store |
+| `save_app_config_batch` | Batch settings update from UI |
+| `test_connection` | Test AI provider connectivity |
+| `rename_pdfs` | Main rename pipeline (read → extract → AI → rename) |
+| `undo_rename` | Undo last batch |
+| `validate_config` | Config validation on startup |
+| `get_config` / `get_config_path` / `save_config_cmd` | Config CRUD |
+| `extract_metadata_from_text` / `extract_metadata_from_vision` | Direct AI extraction |
+| `read_file_bytes` / `read_file_base64` | File I/O utilities |
 
 ## License
 

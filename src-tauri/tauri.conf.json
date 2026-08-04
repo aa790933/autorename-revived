@@ -4,10 +4,10 @@
   "version": "3.0.4",
   "identifier": "com.autorename-revived.gui",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../gui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm run colors && pnpm run build:css && pnpm run dev",
-    "beforeBuildCommand": "pnpm run colors && pnpm run build:css && pnpm run build"
+    "beforeDevCommand": "cd ../gui && pnpm run colors && pnpm run build:css && pnpm run dev",
+    "beforeBuildCommand": "cd ../gui && pnpm run colors && pnpm run build:css && pnpm run build"
   },
   "app": {
     "windows": [

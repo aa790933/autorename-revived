@@ -30,7 +30,7 @@ jobs:
           if ("${{ github.ref }}" -match "^refs/tags/v") {
             $v = "${{ github.ref_name }}" -replace "^v", ""
           } else {
-            $cargoToml = "gui\src-tauri\Cargo.toml"
+            $cargoToml = "src-tauri\Cargo.toml"
             if (Test-Path $cargoToml) {
               $content = Get-Content $cargoToml -Raw
               if ($content -match 'version\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
@@ -55,7 +55,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: gui/src-tauri -> target
+          workspaces: src-tauri -> target
           shared-key: tauri-windows-portable
       - name: Cache pnpm
         uses: actions/cache@v4
@@ -66,15 +66,15 @@ jobs:
             pnpm-
       - name: Build Tauri GUI (portable)
         shell: pwsh
-        working-directory: gui
         run: |
-          pnpm install --frozen-lockfile
-          pnpm run build:css
-          pnpm tauri build
+          cd src-tauri
+          pnpm --dir ../gui install --frozen-lockfile
+          pnpm --dir ../gui run build:css
+          pnpm --dir ../gui tauri build
       - name: Verify GUI EXE
         shell: pwsh
         run: |
-          $exe = "gui\src-tauri\target\release\autorename-revived-gui.exe"
+          $exe = "src-tauri\target\release\autorename-revived-gui.exe"
           if (-not (Test-Path $exe)) { throw "Tauri EXE not found" }
           $size = (Get-Item $exe).Length
           if ($size -lt 5MB) { throw "Tauri EXE undersized: $size bytes" }
@@ -87,7 +87,7 @@ jobs:
           $v = "${{ steps.version.outputs.version }}"
           $dir = "dist\portable"
           New-Item -ItemType Directory -Force -Path $dir
-          Copy-Item "gui\src-tauri\target\release\autorename-revived-gui.exe" "$dir\AutoRename-Revived.exe" -Force
+          Copy-Item "src-tauri\target\release\autorename-revived-gui.exe" "$dir\AutoRename-Revived.exe" -Force
           Compress-Archive -Path "$dir\*" -DestinationPath "dist\AutoRename-v${v}-Portable.zip" -Force
           Write-Output "Portable ZIP created with $(Get-ChildItem $dir | Measure-Object | Select-Object -ExpandProperty Count) files"
       - name: Upload portable artifact
@@ -112,7 +112,7 @@ jobs:
           if ("${{ github.ref }}" -match "^refs/tags/v") {
             $v = "${{ github.ref_name }}" -replace "^v", ""
           } else {
-            $cargoToml = "gui\src-tauri\Cargo.toml"
+            $cargoToml = "src-tauri\Cargo.toml"
             if (Test-Path $cargoToml) {
               $content = Get-Content $cargoToml -Raw
               if ($content -match 'version\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
@@ -136,7 +136,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: gui/src-tauri -> target
+          workspaces: src-tauri -> target
           shared-key: tauri-windows-installer
       - name: Cache pnpm
         uses: actions/cache@v4
@@ -147,16 +147,16 @@ jobs:
             pnpm-
       - name: Build Tauri MSI
         shell: pwsh
-        working-directory: gui
         run: |
-          pnpm install --frozen-lockfile
-          pnpm run build:css
-          pnpm tauri build --bundles msi
+          cd src-tauri
+          pnpm --dir ../gui install --frozen-lockfile
+          pnpm --dir ../gui run build:css
+          pnpm --dir ../gui tauri build --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
           name: gui-msi
-          path: gui/src-tauri/target/release/bundle/msi/*.msi
+          path: src-tauri/target/release/bundle/msi/*.msi
 
   # ────────────────────────────────────────────────────────────
   # RELEASE — draft with all artifacts
@@ -174,7 +174,7 @@ jobs:
           if ("${{ github.ref }}" -match "^refs/tags/v") {
             $v = "${{ github.ref_name }}" -replace "^v", ""
           } else {
-            $cargoToml = "gui\src-tauri\Cargo.toml"
+            $cargoToml = "src-tauri\Cargo.toml"
             if (Test-Path $cargoToml) {
               $content = Get-Content $cargoToml -Raw
               if ($content -match 'version\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
