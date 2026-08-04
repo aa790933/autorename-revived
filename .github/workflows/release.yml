@@ -71,7 +71,7 @@ jobs:
       - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: src-tauri
-        run: node ../gui/node_modules/@tauri-apps/cli/bin/tauri.js build
+        run: node ../gui/node_modules/@tauri-apps/cli/tauri.js build
       - name: Verify GUI EXE
         shell: pwsh
         run: |
@@ -153,7 +153,7 @@ jobs:
       - name: Build Tauri MSI
         shell: pwsh
         working-directory: src-tauri
-        run: node ../gui/node_modules/@tauri-apps/cli/bin/tauri.js build --bundles msi
+        run: node ../gui/node_modules/@tauri-apps/cli/tauri.js build --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
