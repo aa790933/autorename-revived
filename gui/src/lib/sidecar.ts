@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { join, appDataDir } from '@tauri-apps/api/path';
+import { appDataDir } from '@tauri-apps/api/path';
 
 export interface FileResult {
   file: string;
@@ -76,7 +76,6 @@ export async function renamePdfs(
     vision?: boolean;
     textOnly?: boolean;
   } = {},
-  onProgress?: (line: string) => void,
 ): Promise<SidecarResult> {
   try {
     const result = await invoke<BatchResult>('rename_pdfs', {
