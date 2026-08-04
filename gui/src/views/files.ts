@@ -214,11 +214,7 @@ async function runRename(dryRun: boolean): Promise<void> {
     setState({ processing: true, progress: 'Applying cached results\u2026' });
     try {
       const undoLogDir = await getUndoLogDir();
-      const batch = await applyCachedRenames(
-        filesToRename,
-        undoLogDir,
-        (line) => setState({ progress: line }),
-      );
+      const batch = await applyCachedRenames(filesToRename, undoLogDir);
       setState({ processing: false, progress: '', statusError: '' });
       updateFileStatuses(batch, false);
       setState({ lastResult: batch, dryRunResult: null, lastBatchId: batch.batch_id ?? null });
@@ -249,7 +245,6 @@ async function runRename(dryRun: boolean): Promise<void> {
     result = await renamePdfs(
       paths,
       { dryRun, provider: getConfigSync().ai.provider },
-      (line) => setState({ progress: line }),
     );
   } catch (err) {
     const errStr = String(err);
