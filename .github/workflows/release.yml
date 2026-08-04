@@ -68,6 +68,13 @@ jobs:
         shell: pwsh
         working-directory: gui
         run: pnpm install --frozen-lockfile
+      - name: Build frontend (CSS + TypeScript)
+        shell: pwsh
+        working-directory: gui
+        run: |
+          pnpm run colors
+          pnpm run build:css
+          pnpm run build
       - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: src-tauri
@@ -150,6 +157,13 @@ jobs:
         shell: pwsh
         working-directory: gui
         run: pnpm install --frozen-lockfile
+      - name: Build frontend (CSS + TypeScript)
+        shell: pwsh
+        working-directory: gui
+        run: |
+          pnpm run colors
+          pnpm run build:css
+          pnpm run build
       - name: Build Tauri MSI
         shell: pwsh
         working-directory: src-tauri

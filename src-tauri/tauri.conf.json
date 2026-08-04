@@ -6,8 +6,7 @@
   "build": {
     "frontendDist": "../gui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "cd ../gui && pnpm run colors && pnpm run build:css && pnpm run dev",
-    "beforeBuildCommand": "cd ../gui && pnpm run colors && pnpm run build:css && pnpm run build"
+    "beforeDevCommand": "cd ../gui && pnpm run colors && pnpm run build:css && pnpm run dev"
   },
   "app": {
     "windows": [
