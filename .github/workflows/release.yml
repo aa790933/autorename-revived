@@ -66,11 +66,10 @@ jobs:
             pnpm-
       - name: Build Tauri GUI (portable)
         shell: pwsh
+        working-directory: gui
         run: |
-          cd src-tauri
-          pnpm --dir ../gui install --frozen-lockfile
-          pnpm --dir ../gui run build:css
-          pnpm --dir ../gui tauri build
+          pnpm install --frozen-lockfile
+          pnpm tauri build --config ../src-tauri/tauri.conf.json
       - name: Verify GUI EXE
         shell: pwsh
         run: |
@@ -147,11 +146,10 @@ jobs:
             pnpm-
       - name: Build Tauri MSI
         shell: pwsh
+        working-directory: gui
         run: |
-          cd src-tauri
-          pnpm --dir ../gui install --frozen-lockfile
-          pnpm --dir ../gui run build:css
-          pnpm --dir ../gui tauri build --bundles msi
+          pnpm install --frozen-lockfile
+          pnpm tauri build --config ../src-tauri/tauri.conf.json --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
