@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+autorename_revived/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.spec
+*.egg
+setup.iss
+
+# Virtual environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Config (user-specific, contains API keys)
+config.yaml
+harmonized-company-names.yaml
+
+# Environment
+.env
+
+# GUI
+gui/node_modules/
+gui/src-tauri/target/
+gui/src-tauri/gen/schemas/
+gui/src/css/generated-colors.css
+gui/package-lock.json
+gui/src-tauri/binaries/
+
+# CI artifact directories
+Releases/
+*.zip
+
+# pytest
+.pytest_cache/
+.coverage

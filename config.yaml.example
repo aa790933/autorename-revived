@@ -1,0 +1,77 @@
+# AutoRename-Revived v3.0.4 Configuration
+# Copy to config.yaml and fill in your values.
+
+config_version: 2
+
+# --- AI Provider (text-based metadata extraction) ---
+# Providers: openai, anthropic, gemini, ollama, xai
+ai:
+  provider: openai
+  api_key: ${OPENAI_API_KEY}
+  model: gpt-4o-mini
+  temperature: 0.0
+  timeout: 30
+
+  # Anthropic (if provider: anthropic)
+  anthropic_model: claude-3-5-haiku-latest
+  anthropic_base_url: https://api.anthropic.com
+
+  # Ollama (if provider: ollama)
+  ollama_base_url: http://localhost:11434/v1
+  ollama_model: llama3.2
+
+  # Gemini REST-compatible (if provider: gemini via text)
+  gemini_base_url: https://generativelanguage.googleapis.com
+  gemini_model: gemini-2.0-flash
+
+  # xAI/Grok (if provider: xai)
+  xai_base_url: https://api.x.ai
+  xai_model: grok-3-beta
+
+# --- Vision Provider (document images / scanned PDFs) ---
+# Uses Google Gemini API for vision-based extraction from images and scanned documents.
+# Gemini has a free tier: 60 requests/minute, 1,500 requests/day.
+vision:
+  provider: gemini
+  gemini:
+    api_key: ${GEMINI_API_KEY}
+    model: gemini-2.0-flash
+    timeout: 30
+
+# --- Naming Template Engine ---
+# Configure how renamed files are constructed.
+# Available fields: {date}, {company}, {doctype}, {category}, {subject}, {original}, {sequence}
+naming:
+  template: "{date}_{company}_{doctype}"
+  fallback: "{date}_Unknown_{doctype}"
+  date_format: "%Y%m%d"
+  separator: "_"
+  max_length: 128
+  sequence_zerofill: 2
+
+# --- PDF Processing ---
+pdf:
+  vision: auto                # auto, true, false — use Gemini Vision for scanned PDFs
+  ocr: false                  # false, true, "auto" — local OCR via PaddleOCR (requires separate install)
+
+# --- Undo ---
+undo:
+  enabled: true
+  log_path: ~/.autorename-revived/rename_history.json
+  max_entries: 100
+
+# --- Harmonized Company Names ---
+# Optional: map known company names and their variations for consistent naming.
+harmonized_companies:
+  - name: Acme Corp
+    variations:
+      - ACME Corporation
+      - acme
+      - Acme Inc
+  - name: Globex Inc
+    variations:
+      - Globex Incorporated
+      - GLOBEX
+
+debug: false
+max_workers: 4

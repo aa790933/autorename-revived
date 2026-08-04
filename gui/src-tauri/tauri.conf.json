@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "AutoRename-Revived",
+  "version": "3.0.4",
+  "identifier": "com.autorename-revived.gui",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm run colors && pnpm run build:css && pnpm run dev",
+    "beforeBuildCommand": "pnpm run colors && pnpm run build:css && pnpm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AutoRename-Revived",
+        "width": 900,
+        "height": 600,
+        "minWidth": 700,
+        "minHeight": 450,
+        "decorations": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "externalBin": [
+      "binaries/autorename-revived-cli"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ]
+  }
+}

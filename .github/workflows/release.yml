@@ -1,0 +1,387 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.0"
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # TEST
+  # ────────────────────────────────────────────────────────────
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: "requirements*.txt"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short --cov=autorename_revived
+
+  # ────────────────────────────────────────────────────────────
+  # BUILD CLI (standalone headless executable)
+  # ────────────────────────────────────────────────────────────
+  build-cli:
+    name: Build CLI
+    needs: [test]
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derive version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "^refs/tags/v") {
+            $v = "${{ github.ref_name }}" -replace "^v", ""
+          } else {
+            $verFile = "autorename_revived\_version.py"
+            if (Test-Path $verFile) {
+              $content = Get-Content $verFile -Raw
+              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            } else { $v = "0.0.0" }
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "VERSION=$v" >> $env:GITHUB_ENV
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+          Write-Output "CLI version: $v"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: "requirements*.txt"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Write version
+        shell: pwsh
+        run: Set-Content -Path "autorename_revived/_version.py" -Value "VERSION = `"${{ steps.version.outputs.version }}`"" -Encoding UTF8
+      - name: Build CLI (PyInstaller --onefile)
+        shell: pwsh
+        run: |
+          pyinstaller --onefile cli.py `
+            --name "autorename-revived-cli" `
+            --distpath dist\cli --workpath build_tmp --noconfirm `
+            --collect-all autorename_revived `
+            --collect-all pypdfium2 --collect-all pypdfium2_raw `
+            --collect-data dateparser `
+            --collect-submodules openai --collect-submodules anthropic `
+            --hidden-import pydantic --hidden-import google.generativeai `
+            --add-data "config.yaml.example;." --add-data ".env.example;."
+      - name: Verify CLI
+        shell: pwsh
+        run: |
+          $exe = "dist\cli\autorename-revived-cli.exe"
+          if (-not (Test-Path $exe)) { throw "CLI EXE not found" }
+          $size = (Get-Item $exe).Length
+          if ($size -lt 5MB) { throw "CLI EXE undersized: $size bytes" }
+          $v = & $exe --version 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "CLI --version failed" }
+          Write-Output "PASS: CLI v$v ($([math]::Round($size/1MB,1)) MB)"
+      - name: Package CLI ZIP
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          Compress-Archive -Path dist\cli\autorename-revived-cli.exe `
+            -DestinationPath "dist\AutoRename-v${v}-CLI.zip" -Force
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-zip
+          path: dist/AutoRename-v*-CLI.zip
+
+  # ────────────────────────────────────────────────────────────
+  # BUILD GUI PORTABLE (EXE + sidecar → standalone ZIP)
+  # ────────────────────────────────────────────────────────────
+  build-gui-portable:
+    name: Build GUI Portable
+    needs: [test]
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derive version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "^refs/tags/v") {
+            $v = "${{ github.ref_name }}" -replace "^v", ""
+          } else {
+            $verFile = "autorename_revived\_version.py"
+            if (Test-Path $verFile) {
+              $content = Get-Content $verFile -Raw
+              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            } else { $v = "0.0.0" }
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "VERSION=$v" >> $env:GITHUB_ENV
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+          Write-Output "GUI version: $v"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: "requirements*.txt"
+      - name: Install Python + PyInstaller
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Write version
+        shell: pwsh
+        run: Set-Content -Path "autorename_revived/_version.py" -Value "VERSION = `"${{ steps.version.outputs.version }}`"" -Encoding UTF8
+      - name: Build CLI sidecar for GUI
+        shell: pwsh
+        run: |
+          pyinstaller --onefile cli.py `
+            --name "autorename-revived-cli" `
+            --distpath dist\cli --workpath build_tmp --noconfirm `
+            --collect-all autorename_revived `
+            --collect-all pypdfium2 --collect-all pypdfium2_raw `
+            --collect-data dateparser `
+            --collect-submodules openai --collect-submodules anthropic `
+            --hidden-import pydantic --hidden-import google.generativeai `
+            --add-data "config.yaml.example;." --add-data ".env.example;."
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "${{ env.NODE_VERSION }}"
+          cache: pnpm
+          cache-dependency-path: gui/pnpm-lock.yaml
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gui/src-tauri -> target
+          shared-key: tauri-windows
+      - name: Copy sidecar into Tauri binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path gui\src-tauri\binaries
+          Copy-Item "dist\cli\autorename-revived-cli.exe" `
+            "gui\src-tauri\binaries\autorename-revived-cli-x86_64-pc-windows-msvc.exe" -Force
+      - name: Build Tauri GUI (portable, no bundles)
+        shell: pwsh
+        working-directory: gui
+        run: |
+          pnpm install --frozen-lockfile
+          $conf = Get-Content src-tauri\tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.bundle.targets = @()
+          $conf | ConvertTo-Json -Depth 10 | Set-Content src-tauri\tauri.conf.json -Encoding UTF8
+          pnpm tauri build
+      - name: Verify GUI EXE
+        shell: pwsh
+        run: |
+          $exe = "gui\src-tauri\target\release\autorename-revived-gui.exe"
+          if (-not (Test-Path $exe)) { throw "Tauri EXE not found" }
+          $size = (Get-Item $exe).Length
+          if ($size -lt 5MB) { throw "Tauri EXE undersized: $size bytes" }
+          $peVer = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+          $v = "$($peVer.FileMajorPart).$($peVer.FileMinorPart).$($peVer.FileBuildPart)"
+          Write-Output "PASS: GUI v$v ($([math]::Round($size/1MB,1)) MB)"
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $dir = "dist\portable"
+          New-Item -ItemType Directory -Force -Path $dir
+          Copy-Item "gui\src-tauri\target\release\autorename-revived-gui.exe" "$dir\AutoRename-Revived.exe" -Force
+          Copy-Item "dist\cli\autorename-revived-cli.exe" "$dir\autorename-revived-cli.exe" -Force
+          Compress-Archive -Path "$dir\*" -DestinationPath "dist\AutoRename-v${v}-Portable.zip" -Force
+          Write-Output "Portable ZIP created with $(Get-ChildItem $dir | Measure-Object | Select-Object -ExpandProperty Count) files"
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-portable-zip
+          path: dist/AutoRename-v*-Portable.zip
+
+  # ────────────────────────────────────────────────────────────
+  # BUILD GUI INSTALLER (MSI)
+  # ────────────────────────────────────────────────────────────
+  build-gui-installer:
+    name: Build GUI Installer
+    needs: [test]
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derive version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "^refs/tags/v") {
+            $v = "${{ github.ref_name }}" -replace "^v", ""
+          } else {
+            $verFile = "autorename_revived\_version.py"
+            if (Test-Path $verFile) {
+              $content = Get-Content $verFile -Raw
+              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            } else { $v = "0.0.0" }
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "VERSION=$v" >> $env:GITHUB_ENV
+          Write-Output "Installer version: $v"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: "requirements*.txt"
+      - name: Install Python + PyInstaller
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Write version
+        shell: pwsh
+        run: Set-Content -Path "autorename_revived/_version.py" -Value "VERSION = `"${{ steps.version.outputs.version }}`"" -Encoding UTF8
+      - name: Build CLI sidecar for installer
+        shell: pwsh
+        run: |
+          pyinstaller --onefile cli.py `
+            --name "autorename-revived-cli" `
+            --distpath dist\cli --workpath build_tmp_inst --noconfirm `
+            --collect-all autorename_revived `
+            --collect-all pypdfium2 --collect-all pypdfium2_raw `
+            --collect-data dateparser `
+            --collect-submodules openai --collect-submodules anthropic `
+            --hidden-import pydantic --hidden-import google.generativeai `
+            --add-data "config.yaml.example;." --add-data ".env.example;."
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "${{ env.NODE_VERSION }}"
+          cache: pnpm
+          cache-dependency-path: gui/pnpm-lock.yaml
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gui/src-tauri -> target
+          shared-key: tauri-windows-installer
+      - name: Copy sidecar into Tauri binaries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path gui\src-tauri\binaries
+          Copy-Item "dist\cli\autorename-revived-cli.exe" `
+            "gui\src-tauri\binaries\autorename-revived-cli-x86_64-pc-windows-msvc.exe" -Force
+      - name: Build Tauri MSI
+        shell: pwsh
+        working-directory: gui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm tauri build --bundles msi
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-msi
+          path: gui/src-tauri/target/release/bundle/msi/*.msi
+
+  # ────────────────────────────────────────────────────────────
+  # RELEASE — draft with all artifacts
+  # ────────────────────────────────────────────────────────────
+  release:
+    name: Create Draft Release
+    needs: [build-cli, build-gui-portable, build-gui-installer]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Derive version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "^refs/tags/v") {
+            $v = "${{ github.ref_name }}" -replace "^v", ""
+          } else {
+            $verFile = "autorename_revived\_version.py"
+            if (Test-Path $verFile) {
+              $content = Get-Content $verFile -Raw
+              if ($content -match 'VERSION\s*=\s*"([\d.]+)"') { $v = $Matches[1] } else { $v = "0.0.0" }
+            } else { $v = "0.0.0" }
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+          Write-Output "Release: v$v"
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/artifacts
+      - name: Stage release files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\release
+          Get-ChildItem -Path dist\artifacts -Recurse -File | ForEach-Object {
+            Copy-Item $_.FullName "dist\release\$($_.Name)" -Force
+            Write-Output "  $($_.Name) ($([math]::Round($_.Length/1MB,1)) MB)"
+          }
+          Write-Output "=== Release assets ==="
+          Get-ChildItem dist\release | ForEach-Object { Write-Output "  $($_.Name)" }
+      - name: Create GitHub Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AutoRename-Revived ${{ steps.version.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
+          body: |
+            ## AutoRename-Revived ${{ steps.version.outputs.tag }}
+
+            ### Assets
+
+            | Artifact | Description |
+            |----------|-------------|
+            | `AutoRename-v${{ steps.version.outputs.version }}-Portable.zip` | Portable GUI + CLI (standalone, no install needed) |
+            | `AutoRename-v${{ steps.version.outputs.version }}-CLI.zip` | CLI only (headless, `autorename-revived-cli.exe`) |
+            | `*.msi` | Windows installer |
+
+            ### Quick Start
+
+            1. Download `AutoRename-v${{ steps.version.outputs.version }}-Portable.zip`
+            2. Extract anywhere
+            3. Run `AutoRename-Revived.exe`
+
+            ### Verification
+
+            - CLI: `--version` verified
+            - GUI: PE version verified
+            - MSI: valid size gate passed
+
+            **Review this draft, edit if needed, then publish.**
+          files: dist/release/*
+          fail_on_unmatched_files: true
