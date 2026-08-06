@@ -42,8 +42,8 @@ impl Default for NamingConfig {
         Self {
             template: "{date}_{company}_{doctype}".to_string(),
             fallback: "{date}_Unknown_{doctype}".to_string(),
-            date_format: "%Y%m%d".to_string(),
-            separator: "_".to_string(),
+            date_format: String::from("%Y%m%d"),
+            separator: String::from("_"),
             max_length: 128,
             sequence_zerofill: 2,
         }
@@ -102,7 +102,7 @@ pub fn get_store_path(app: &tauri::AppHandle) -> PathBuf {
 fn resolve_env_vars(value: &str) -> String {
     let mut result = value.to_string();
     // Resolve ${VAR} patterns
-    let env_re = regex::Regex::new(r"\$\{(\w+)\}").unwrap();
+    let env_re = regex::Regex::new(r#"\$\{(\w+)\}"#).unwrap();
     let matches: Vec<String> = env_re
         .find_iter(&result)
         .map(|m| m.as_str().to_string())
@@ -114,7 +114,7 @@ fn resolve_env_vars(value: &str) -> String {
         }
     }
     // Resolve $VAR patterns (word boundary)
-    let simple_re = regex::Regex::new(r"\$(\w+)").unwrap();
+    let simple_re = regex::Regex::new(r#"\$(\w+)"#).unwrap();
     let simple_matches: Vec<String> = simple_re
         .find_iter(&result)
         .map(|m| m.as_str().to_string())

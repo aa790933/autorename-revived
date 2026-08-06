@@ -12,6 +12,7 @@ permissions:
 env:
   NODE_VERSION: "22"
   PNPM_VERSION: "9.15.0"
+  RUST_VERSION: "stable"
 
 jobs:
   # ────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ jobs:
           cache-dependency-path: gui/pnpm-lock.yaml
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          target: x86_64-pc-windows-msvc
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
@@ -75,6 +78,9 @@ jobs:
           pnpm run colors
           pnpm run build:css
           pnpm run build
+      - name: Install Tauri CLI
+        shell: pwsh
+        run: cargo install tauri-cli --version "^2" --locked
       - name: Clean stale Rust artifacts
         shell: pwsh
         working-directory: src-tauri
@@ -82,11 +88,11 @@ jobs:
       - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: src-tauri
-        run: node ../gui/node_modules/@tauri-apps/cli/tauri.js build
+        run: cargo tauri build --target x86_64-pc-windows-msvc
       - name: Verify GUI EXE
         shell: pwsh
         run: |
-          $exe = "src-tauri\target\release\autorename-revived-gui.exe"
+          $exe = "src-tauri\target\x86_64-pc-windows-msvc\release\autorename-revived-gui.exe"
           if (-not (Test-Path $exe)) { throw "Tauri EXE not found" }
           $size = (Get-Item $exe).Length
           if ($size -lt 5MB) { throw "Tauri EXE undersized: $size bytes" }
@@ -99,7 +105,7 @@ jobs:
           $v = "${{ steps.version.outputs.version }}"
           $dir = "dist\portable"
           New-Item -ItemType Directory -Force -Path $dir
-          Copy-Item "src-tauri\target\release\autorename-revived-gui.exe" "$dir\AutoRename-Revived.exe" -Force
+          Copy-Item "src-tauri\target\x86_64-pc-windows-msvc\release\autorename-revived-gui.exe" "$dir\AutoRename-Revived.exe" -Force
           Compress-Archive -Path "$dir\*" -DestinationPath "dist\AutoRename-v${v}-Portable.zip" -Force
           Write-Output "Portable ZIP created with $(Get-ChildItem $dir | Measure-Object | Select-Object -ExpandProperty Count) files"
       - name: Upload portable artifact
@@ -145,6 +151,8 @@ jobs:
           cache-dependency-path: gui/pnpm-lock.yaml
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          target: x86_64-pc-windows-msvc
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
@@ -168,6 +176,9 @@ jobs:
           pnpm run colors
           pnpm run build:css
           pnpm run build
+      - name: Install Tauri CLI
+        shell: pwsh
+        run: cargo install tauri-cli --version "^2" --locked
       - name: Clean stale Rust artifacts
         shell: pwsh
         working-directory: src-tauri
@@ -175,12 +186,12 @@ jobs:
       - name: Build Tauri MSI
         shell: pwsh
         working-directory: src-tauri
-        run: node ../gui/node_modules/@tauri-apps/cli/tauri.js build --bundles msi
+        run: cargo tauri build --target x86_64-pc-windows-msvc --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
           name: gui-msi
-          path: src-tauri/target/release/bundle/msi/*.msi
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
 
   # ────────────────────────────────────────────────────────────
   # RELEASE — draft with all artifacts
