@@ -133,15 +133,15 @@ impl UndoHistory {
 
 pub fn sanitize_filename(name: &str, max_length: usize) -> String {
     if name.is_empty() {
-        return "_".to_string();
+        return String::from("_");
     }
 
-    let invalid_fs_chars = Regex::new(r"[\x00-\x1f\\/:*?\"<>|]").unwrap();
-    let unicode_control = Regex::new(r"[\u200b-\u200f\u2028-\u202f\u2060-\u2064\ufeff\u00ad]").unwrap();
-    let gibberish_hex = Regex::new(r"\b[0-9a-f]{8,}\b").unwrap();
-    let gibberish_long_num = Regex::new(r"\b\d{6,}\b").unwrap();
-    let leading_trailing = Regex::new(r"^[\W_]+|[\W_]+$").unwrap();
-    let multi_sep = Regex::new(r"[_ \-]{2,}").unwrap();
+    let invalid_fs_chars = Regex::new(r#"[\x00-\x1f\\/:*?\"<>|]"#).unwrap();
+    let unicode_control = Regex::new(r#"[\u200b-\u200f\u2028-\u202f\u2060-\u2064\ufeff\u00ad]"#).unwrap();
+    let gibberish_hex = Regex::new(r#"\b[0-9a-f]{8,}\b"#).unwrap();
+    let gibberish_long_num = Regex::new(r#"\b\d{6,}\b"#).unwrap();
+    let leading_trailing = Regex::new(r#"^[\W_]+|[\W_]+$"#).unwrap();
+    let multi_sep = Regex::new(r#"[_ \-]{2,}"#).unwrap();
 
     let reserved_names = [
         "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6",
@@ -158,7 +158,7 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
     let parts: Vec<&str> = cleaned.split('_').filter(|s| !s.is_empty()).collect();
     let mut cleaned = parts.join("_");
     if cleaned.is_empty() {
-        cleaned = "_".to_string();
+        cleaned = String::from("_");
     }
 
     if cleaned.starts_with('.') {
@@ -210,16 +210,16 @@ pub fn parse_document_date(date_str: &str) -> Option<String> {
         return Some(cleaned);
     }
 
-    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        return Some(parsed.format("%Y%m%d").to_string());
+    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, r#"%Y-%m-%d"#) {
+        return Some(parsed.format(r#"%Y%m%d"#).to_string());
     }
 
-    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, "%m/%d/%Y") {
-        return Some(parsed.format("%Y%m%d").to_string());
+    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, r#"%m/%d/%Y"#) {
+        return Some(parsed.format(r#"%Y%m%d"#).to_string());
     }
 
-    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, "%d/%m/%Y") {
-        return Some(parsed.format("%Y%m%d").to_string());
+    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, r#"%d/%m/%Y"#) {
+        return Some(parsed.format(r#"%Y%m%d"#).to_string());
     }
 
     None
@@ -266,7 +266,7 @@ pub fn generate_filename(
     let suffix = Path::new(original_filename)
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()))
-        .unwrap_or_else(|| ".pdf".to_string());
+        .unwrap_or_else(|| String::from(".pdf"));
 
     let has_content = !company.is_empty() || !doctype.is_empty() || !date_str.is_empty() || !original_filename.is_empty();
     let template = if has_content {
@@ -277,7 +277,7 @@ pub fn generate_filename(
 
     let date_formatted = if date_str.len() == 8 && date_str.chars().all(|c| c.is_ascii_digit()) {
         date_str.to_string()
-    } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+    } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, r#"%Y-%m-%d"#) {
         parsed.format(&config.date_format).to_string()
     } else {
         "00000000".to_string()
@@ -360,7 +360,7 @@ pub fn save_rename_to_history(
         });
     } else {
         let batch_id = if batch_id.is_empty() {
-            format!("gui-{}", chrono::Local::now().format("%Y%m%dT%H%M%S"))
+            format!("gui-{}", chrono::Local::now().format(r#"%Y%m%dT%H%M%S"#))
         } else {
             batch_id.to_string()
         };

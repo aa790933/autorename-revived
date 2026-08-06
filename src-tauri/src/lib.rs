@@ -265,7 +265,7 @@ async fn rename_pdfs(
 
     let batch_id = format!(
         "gui-{}",
-        chrono::Local::now().format("%Y%m%dT%H%M%S")
+        chrono::Local::now().format(r#"%Y%m%dT%H%M%S"#)
     );
 
     let mut result = BatchResult {
