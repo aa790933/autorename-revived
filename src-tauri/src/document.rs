@@ -1,12 +1,10 @@
-use crate::ai::DocumentMetadata;
-use crate::config::{AiConfig, NamingConfig};
+use crate::ai::{AiConfig, DocumentMetadata};
+use crate::config::NamingConfig;
 use chrono::NaiveDate;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tracing::info;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileResult {
@@ -140,8 +138,8 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
     let unicode_control = Regex::new(r#"[\u200b-\u200f\u2028-\u202f\u2060-\u2064\ufeff\u00ad]"#).unwrap();
     let gibberish_hex = Regex::new(r#"\b[0-9a-f]{8,}\b"#).unwrap();
     let gibberish_long_num = Regex::new(r#"\b\d{6,}\b"#).unwrap();
-    let leading_trailing = Regex::new(r#"^[\W_]+|[\W_]+$"#).unwrap();
-    let multi_sep = Regex::new(r#"[_ \-]{2,}"#).unwrap();
+    let _leading_trailing = Regex::new(r#"^[\W_]+|[\W_]+$"#).unwrap();
+    let _multi_sep = Regex::new(r#"[_ \-]{2,}"#).unwrap();
 
     let reserved_names = [
         "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6",
@@ -180,7 +178,8 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
 
 pub fn resolve_safe_path(directory: &str, filename: &str) -> Result<String, String> {
     let dir_path = Path::new(directory).canonicalize().unwrap_or_else(|_| Path::new(directory).to_path_buf());
-    let safe_name = Path::new(&sanitize_filename(filename, 128));
+    let safe_filename = sanitize_filename(filename, 128);
+    let safe_name = Path::new(&safe_filename);
     let resolved = dir_path.join(safe_name);
 
     let resolved_str = resolved.to_string_lossy().to_string();
@@ -286,17 +285,16 @@ pub fn generate_filename(
     let clean_company = sanitize_filename(company, 48);
     let clean_doctype = sanitize_filename(doctype, 48);
 
-    let fields: HashMap<&str, &str> = [
-        ("date", &date_formatted),
-        ("company", if clean_company.is_empty() { "Unknown" } else { &clean_company }),
-        ("doctype", if clean_doctype.is_empty() { "Doc" } else { &clean_doctype }),
-        ("category", if clean_company.is_empty() { "Unknown" } else { &clean_company }),
-        ("subject", if company.is_empty() && doctype.is_empty() { "Unknown" } else { company }),
-        ("original", &Path::new(original_filename).file_stem().map(|s| s.to_string_lossy().as_ref()).unwrap_or("file")),
-        ("sequence", "01"),
+    let fields: HashMap<String, String> = [
+        ("date".to_string(), date_formatted.clone()),
+        ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
+        ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
+        ("category".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
+        ("subject".to_string(), if company.is_empty() && doctype.is_empty() { "Unknown".to_string() } else { company.to_string() }),
+        ("original".to_string(), Path::new(original_filename).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "file".to_string())),
+        ("sequence".to_string(), "01".to_string()),
     ]
-    .iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .into_iter()
     .collect();
 
     let mut result = template.to_string();
@@ -305,13 +303,12 @@ pub fn generate_filename(
     }
 
     if result == template || result.is_empty() {
-        let fallback_fields: HashMap<&str, &str> = [
-            ("date", &date_formatted),
-            ("company", if clean_company.is_empty() { "Unknown" } else { &clean_company }),
-            ("doctype", if clean_doctype.is_empty() { "Doc" } else { &clean_doctype }),
+        let fallback_fields: HashMap<String, String> = [
+            ("date".to_string(), date_formatted.clone()),
+            ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
+            ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
         ]
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .into_iter()
         .collect();
         result = config.fallback.to_string();
         for (key, val) in &fallback_fields {
@@ -402,7 +399,7 @@ pub fn undo_last_rename(
         });
     }
 
-    let (batch_idx, file_idx) = if !batch_id.is_empty() {
+    let Some((batch_idx, file_idx)) = (if !batch_id.is_empty() {
         batches.iter().rposition(|b| b.batch_id == batch_id && !b.undone).and_then(|bi| {
             let fi = batches[bi].files.len().saturating_sub(1);
             if fi < batches[bi].files.len() {
@@ -416,19 +413,14 @@ pub fn undo_last_rename(
             let fi = batches[bi].files.len().saturating_sub(1);
             Some((bi, fi))
         })
-    };
-
-    let (bi, fi) = match (batch_idx, file_idx) {
-        (Some(b), Some(f)) => (b, f),
-        _ => {
-            return Ok(UndoResult {
-                success: false,
-                restored: 0,
-                failed: 0,
-                files: Vec::new(),
-                batch_id: None,
-            });
-        }
+    }) else {
+        return Ok(UndoResult {
+            success: false,
+            restored: 0,
+            failed: 0,
+            files: Vec::new(),
+            batch_id: None,
+        });
     };
 
     let entry = batches[bi].files[fi].clone();

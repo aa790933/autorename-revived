@@ -151,7 +151,8 @@ pub fn extract_text_from_pdf(bytes: &[u8]) -> Result<String, String> {
 
     let mut all_text = Vec::new();
 
-    for page_num in doc.get_pages() {
+    let pages = doc.get_pages();
+    for (page_num, _obj_id) in pages {
         if let Ok(text) = extract_pdf_page_text(&doc, page_num) {
             if !text.is_empty() {
                 all_text.push(text);
@@ -176,19 +177,19 @@ fn extract_pdf_page_text(doc: &lopdf::Document, page_num: u32) -> Result<String,
             if let Ok(content_obj) = doc.get_object(*content_id) {
                 if let lopdf::Object::Stream(inner) = content_obj {
                     if let Ok(decoded) = inner.decode_content() {
-                        let ops = lopdf::content::Operation::parse(&decoded);
+                        let ops = lopdf::content::Operations::parse(&decoded);
                         for op in ops {
                             if op.operator == "Tj" || op.operator == "TJ" {
                                 if let Some(args) = op.operands.first() {
                                     match args {
                                         lopdf::Object::String(s, _) => {
-                                            text.push_str(&String::from_utf8_lossy(s));
+                                            text.push_str(&String::from_utf8_lossy(s.as_ref()));
                                             text.push(' ');
                                         }
                                         lopdf::Object::Array(arr) => {
                                             for item in arr {
                                                 if let lopdf::Object::String(s, _) = item {
-                                                    text.push_str(&String::from_utf8_lossy(s));
+                                                    text.push_str(&String::from_utf8_lossy(s.as_ref()));
                                                 }
                                             }
                                             text.push(' ');
@@ -254,75 +255,27 @@ fn extract_shared_strings(xml: &str) -> Vec<String> {
     for ch in xml.chars() {
         match ch {
             '<' => {
-                if current.ends_with("t") || current.ends_with("/t") {
-                    // end of tag, check if we were in <t>
-                }
                 if !current.is_empty() && in_t {
                     strings.push(current.clone());
                     current.clear();
                 }
-                in_tag_start(&current, &mut in_t);
+                in_t = false;
                 current.clear();
             }
             '>' => {
-                if current.ends_with("/t") || current == "/t" || current.ends_with("/t ") {
-                    in_t = false;
-                }
+                in_t = false;
                 current.clear();
             }
-            _ if in_tag => {
-                current.push(ch);
+            _ => {
+                if in_t {
+                    current.push(ch);
+                }
             }
-            _ if in_t => {
-                // not inside tag brackets, but we're past the >
-                // Actually we need to handle text content between > and <
-            }
-            _ => {}
         }
     }
 
-    // Simpler approach: use regex-like manual parsing
-    let mut result = Vec::new();
-    let mut in_si = false;
-    let mut in_t = false;
-    let mut buf = String::new();
-
-    for ch in xml.chars() {
-        match ch {
-            '<' => {
-                if in_t && !buf.is_empty() {
-                    result.push(buf.clone());
-                    buf.clear();
-                }
-                in_t = false;
-            }
-            '>' if buf.ends_with("/t") || buf == "/t" || buf.ends_with("/t ") => {
-                in_t = false;
-            }
-            '>' => {
-                if buf.ends_with("t") && !buf.starts_with('/') && !buf.contains(' ') {
-                    in_t = true;
-                }
-                if buf.contains("si") && !buf.starts_with('/') {
-                    in_si = true;
-                }
-                if buf == "/si" {
-                    in_si = false;
-                }
-                buf.clear();
-            }
-            _ if in_t => {
-                result.last_mut().unwrap_or(&mut buf).push(ch);
-                if result.is_empty() {
-                    buf.push(ch);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // Fallback: just do simple tag stripping on the whole XML
-    if result.is_empty() {
+    // Simpler approach: use tag stripping on the whole XML
+    if strings.is_empty() {
         let stripped = extract_xml_text(xml);
         return stripped
             .split_whitespace()
@@ -330,11 +283,7 @@ fn extract_shared_strings(xml: &str) -> Vec<String> {
             .collect();
     }
 
-    result
-}
-
-fn in_tag_start(_current: &str, _in_tag: &mut bool) {
-    // Placeholder for tag detection logic
+    strings
 }
 
 /// Extract cell text from an XLSX worksheet XML.
@@ -467,6 +416,6 @@ fn decode_bytes_to_string(bytes: &[u8]) -> String {
     }
 
     // Try latin-1 (always succeeds, but may produce garbage)
-    let (decoded, _had_errors) = encoding_rs::LATIN1.decode(bytes);
+    let (decoded, _had_errors) = encoding_rs::mem::LATIN1.decode(bytes);
     decoded.into_owned()
 }

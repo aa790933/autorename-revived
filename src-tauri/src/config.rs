@@ -1,11 +1,12 @@
 use crate::ai::AiConfig;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::Manager;
-use tauri_plugin_store::Store;
+use tauri_plugin_store::StoreBuilder;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PdfConfig {
     pub vision: String,
     pub vision_provider: String,
@@ -27,7 +28,7 @@ impl Default for PdfConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NamingConfig {
     pub template: String,
     pub fallback: String,
@@ -50,7 +51,7 @@ impl Default for NamingConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UndoConfig {
     pub enabled: bool,
     pub log_path: String,
@@ -67,7 +68,7 @@ impl Default for UndoConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub ai: AiConfig,
     pub pdf: PdfConfig,
@@ -78,8 +79,8 @@ pub struct AppConfig {
     pub max_workers: u32,
 }
 
-impl AppConfig {
-    pub fn default() -> Self {
+impl Default for AppConfig {
+    fn default() -> Self {
         Self {
             ai: AiConfig::default(),
             pdf: PdfConfig::default(),
@@ -136,7 +137,9 @@ fn resolve_config_env_vars(config: &mut AppConfig) {
 pub async fn load_config(app: tauri::AppHandle) -> Result<AppConfig, String> {
     let store_path = get_store_path(&app);
     if store_path.exists() {
-        let store = Store::new(app.clone(), store_path.clone())
+        let store = StoreBuilder::new()
+            .path(store_path.clone())
+            .build(app.clone())
             .await
             .map_err(|e| e.to_string())?;
         if let Some(saved) = store.get("config") {
@@ -156,7 +159,9 @@ pub async fn save_config(
     config: &AppConfig,
 ) -> Result<(), String> {
     let store_path = get_store_path(&app);
-    let store = Store::new(app.clone(), store_path)
+    let store = StoreBuilder::new()
+        .path(store_path)
+        .build(app.clone())
         .await
         .map_err(|e| e.to_string())?;
     store

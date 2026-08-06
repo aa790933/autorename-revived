@@ -6,18 +6,14 @@ mod file_utils;
 
 use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
 use config::{AppConfig, ConfigBatchResult, load_config, save_config, save_config_batch};
-use document::{BatchResult, FileResult, UndoResult};
+use document::{BatchResult, FileResult, UndoResult, resolve_safe_path};
 use file_utils::{
-    copy_file, ensure_directory, file_exists, get_file_extension, get_file_name, get_file_size,
+    copy_file, ensure_directory, file_exists, file_size, get_file_extension, get_file_name, get_file_stem,
     get_supported_extensions, is_image_extension, list_files_in_directory,
     preserve_extension, read_file_to_base64, read_file_to_bytes, recursive_find_files,
-    resolve_safe_path, validate_supported_extension,
+    validate_supported_extension,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use tauri::Manager;
+use serde_json;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
