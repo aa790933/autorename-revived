@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use tauri::Manager;
 
 /// Returns true if the app is running in portable mode.
 ///

@@ -2,7 +2,6 @@ use crate::ai::AiConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::Manager;
 use tauri_plugin_store::StoreBuilder;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
