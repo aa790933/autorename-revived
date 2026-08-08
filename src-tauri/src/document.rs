@@ -387,9 +387,8 @@ pub fn undo_last_rename(
     batch_id: &str,
 ) -> Result<UndoResult, String> {
     let mut history = UndoHistory::load(history_path)?;
-    let batches = &mut history.batches;
 
-    if batches.is_empty() {
+    if history.batches.is_empty() {
         return Ok(UndoResult {
             success: false,
             restored: 0,
@@ -400,17 +399,17 @@ pub fn undo_last_rename(
     }
 
     let Some((batch_idx, file_idx)) = (if !batch_id.is_empty() {
-        batches.iter().rposition(|b| b.batch_id == batch_id && !b.undone).and_then(|bi| {
-            let fi = batches[bi].files.len().saturating_sub(1);
-            if fi < batches[bi].files.len() {
+        history.batches.iter().rposition(|b| b.batch_id == batch_id && !b.undone).and_then(|bi| {
+            let fi = history.batches[bi].files.len().saturating_sub(1);
+            if fi < history.batches[bi].files.len() {
                 Some((bi, fi))
             } else {
                 None
             }
         })
     } else {
-        batches.iter().rposition(|b| !b.undone && !b.files.is_empty()).and_then(|bi| {
-            let fi = batches[bi].files.len().saturating_sub(1);
+        history.batches.iter().rposition(|b| !b.undone && !b.files.is_empty()).and_then(|bi| {
+            let fi = history.batches[bi].files.len().saturating_sub(1);
             Some((bi, fi))
         })
     }) else {
@@ -423,7 +422,8 @@ pub fn undo_last_rename(
         });
     };
 
-    let entry = batches[batch_idx].files[file_idx].clone();
+    let entry = history.batches[batch_idx].files[file_idx].clone();
+    let result_batch_id = history.batches[batch_idx].batch_id.clone();
 
     if !Path::new(&entry.new_path).exists() {
         return Ok(UndoResult {
@@ -436,15 +436,15 @@ pub fn undo_last_rename(
                 status: "failed".to_string(),
                 error: Some("Renamed file no longer exists".to_string()),
             }],
-            batch_id: Some(batches[batch_idx].batch_id.clone()),
+            batch_id: Some(result_batch_id),
         });
     }
 
     match fs::rename(&entry.new_path, &entry.old_path) {
         Ok(_) => {
-            batches[batch_idx].files.remove(file_idx);
-            if batches[batch_idx].files.is_empty() {
-                batches[batch_idx].undone = true;
+            history.batches[batch_idx].files.remove(file_idx);
+            if history.batches[batch_idx].files.is_empty() {
+                history.batches[batch_idx].undone = true;
             }
             history.save(history_path)?;
             Ok(UndoResult {
@@ -457,7 +457,7 @@ pub fn undo_last_rename(
                     status: "restored".to_string(),
                     error: None,
                 }],
-                batch_id: Some(batches[batch_idx].batch_id.clone()),
+                batch_id: Some(result_batch_id),
             })
         }
         Err(e) => Ok(UndoResult {
@@ -470,7 +470,7 @@ pub fn undo_last_rename(
                 status: "failed".to_string(),
                 error: Some(e.to_string()),
             }],
-            batch_id: Some(batches[batch_idx].batch_id.clone()),
+            batch_id: Some(result_batch_id),
         }),
     }
 }

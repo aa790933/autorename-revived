@@ -277,7 +277,6 @@ async fn rename_pdfs(
     };
 
     for path in &paths {
-        let file_name = file_utils::get_file_name(path);
         let parent_dir = std::path::Path::new(path)
             .parent()
             .map(|p| p.to_string_lossy().to_string())
