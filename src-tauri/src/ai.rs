@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use tracing::info;
 
-const GEMINI_DEFAULT_MODEL: &str = "gemini-3.1-flash-lite";
+const GEMINI_DEFAULT_MODEL: &str = "gemini-3.5-flash-lite";
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com";
 const OPENAI_API_BASE: &str = "https://api.openai.com";
 const XAI_API_BASE: &str = "https://api.x.ai";
@@ -46,6 +46,8 @@ pub struct DocumentMetadata {
     pub company_name: String,
     pub document_date: String,
     pub document_type: String,
+    pub category: String,
+    pub subject: String,
     pub confidence: f64,
     pub invoice_number: String,
     pub total_amount: String,
@@ -57,6 +59,8 @@ impl Default for DocumentMetadata {
             company_name: String::new(),
             document_date: String::new(),
             document_type: String::new(),
+            category: String::new(),
+            subject: String::new(),
             confidence: 0.0,
             invoice_number: String::new(),
             total_amount: String::new(),
@@ -72,56 +76,28 @@ pub struct TestConnectionResult {
     pub provider: String,
 }
 
-const TEXT_SYSTEM_PROMPT: &str = r#"You extract structured metadata from document text. Return ONLY valid JSON with keys: company_name, document_date (YYYY-MM-DD or empty), document_type, invoice_number, total_amount, confidence (0.0-1.0). Always extract what you can see. For document_type, use one of: Invoice, Receipt, Contract, Report, Letter, Memo, Statement, Certificate, Form, Other. For company_name, use the sender or issuer name. Only set confidence < 0.5 if the document text is mostly unreadable."#;
+const SYSTEM_PROMPT: &str = r#"You are an advanced AI document analyzer specialized in extracting precise metadata for automated file renaming.
+Your primary task is to analyze the provided document or image and extract data into a STRICT JSON format.
+CRITICAL RULES:
+1. Output ONLY valid JSON. 
+2. Do NOT wrap the JSON in markdown blocks (e.g., no ```json). Just output the raw JSON object.
+3. Keep values concise, using underscores '_' instead of spaces for multi-word values.
+4. If a field cannot be determined, use "Unknown" or the current date for dates.
+EXTRACT THE FOLLOWING FIELDS: "date" (YYYYMMDD), "company", "doctype", "category", "subject"."#;
 
-const VISION_SYSTEM_PROMPT: &str = r#"You are an expert Document Classifier and File Renaming Engine. Analyze the provided document/image context, visual layout, header, dates, sender/recipient, and content summary.
-
-INSTRUCTIONS:
-1. Identify the document type (e.g., Invoice, Receipt, Passport, Contract, Photo, Diagram).
-2. Extract key metadata: Date (YYYY-MM-DD), Organization/Entity name, Document Title or Main Subject.
-3. Output ONLY a valid JSON response with keys: company_name, document_date (YYYY-MM-DD or empty), document_type, invoice_number, total_amount, confidence (0.0-1.0).
-4. If content is unreadable or ambiguous, fall back to a structured default like Document_YYYY-MM-DD rather than Unknown.
-5. Never alter the original file extension.
-
-Return ONLY valid JSON."#;
-
-fn strip_ai_gibberish(text: &str) -> String {
-    let text = text.replace("```json", "").replace("```yaml", "").replace("```", "");
-    let text = text.replace("<!--", "").replace("-->", "");
-    let text = text.replace("**", "").replace("__", "").replace("`", "");
-    let text = text.replace('\x00', "").replace('\x07', "").replace('\x0c', "");
-    text.trim().to_string()
-}
-
-fn extract_json_braces(text: &str) -> Option<String> {
-    let start = text.find('{')?;
-    let mut depth = 0;
-    for (i, ch) in text[start..].chars().enumerate() {
-        match ch {
-            '{' => depth += 1,
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(text[start..start + i + 1].to_string());
-                }
-            }
-            _ => {}
-        }
-    }
-    None
+fn clean_json_response(text: &str) -> String {
+    text.trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim()
+    .to_string()
 }
 
 fn parse_json_response(text: &str) -> Result<HashMap<String, serde_json::Value>, String> {
-    let cleaned = strip_ai_gibberish(text);
-    if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&cleaned) {
-        return Ok(parsed);
-    }
-    if let Some(block) = extract_json_braces(&cleaned) {
-        if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&block) {
-            return Ok(parsed);
-        }
-    }
-    Err("Failed to parse AI response as JSON".to_string())
+    let clean_json = clean_json_response(text);
+    serde_json::from_str::<HashMap<String, serde_json::Value>>(&clean_json)
+        .map_err(|e| format!("Failed to parse AI response as JSON: {}", e))
 }
 
 fn guess_mime(ext: &str) -> &'static str {
@@ -223,7 +199,7 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
     let body = serde_json::json!({
         "contents": [{
             "parts": [{
-                "text": format!("{}\n\nDocument text:\n{}\n\nExtract metadata JSON.", TEXT_SYSTEM_PROMPT, text)
+                "text": format!("{}\n\nDocument text:\n{}\n\nExtract metadata JSON.", SYSTEM_PROMPT, text)
             }]
         }],
         "generationConfig": {
@@ -275,7 +251,7 @@ async fn gemini_vision_extract(
     );
 
     let mut contents = Vec::new();
-    contents.push(serde_json::json!({"text": VISION_SYSTEM_PROMPT}));
+    contents.push(serde_json::json!({"text": SYSTEM_PROMPT}));
 
     for (path, buffer) in file_buffers {
         let ext = file_extension(path);
@@ -337,7 +313,7 @@ async fn openai_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
         "model": model,
         "temperature": config.temperature,
         "messages": [
-            {"role": "system", "content": TEXT_SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": format!("Document text:\n\n{}\n\nExtract metadata JSON.", text)}
         ],
         "response_format": {"type": "json_object"}
@@ -382,7 +358,7 @@ async fn openai_vision_extract(
     let url = format!("{}/v1/chat/completions", OPENAI_API_BASE);
 
     let mut content_parts = Vec::new();
-    content_parts.push(serde_json::json!({"type": "text", "text": VISION_SYSTEM_PROMPT}));
+    content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
 
     for (path, buffer) in file_buffers {
         let ext = file_extension(path);
@@ -440,7 +416,7 @@ async fn anthropic_text_extract(text: &str, config: &AiConfig) -> Result<Documen
     let body = serde_json::json!({
         "model": model,
         "max_tokens": 1024,
-        "system": TEXT_SYSTEM_PROMPT,
+        "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": format!("Document text:\n\n{}\n\nExtract metadata JSON.", text)}]
     });
 
@@ -493,7 +469,7 @@ async fn anthropic_vision_extract(
         }));
     }
 
-    content_parts.push(serde_json::json!({"type": "text", "text": VISION_SYSTEM_PROMPT}));
+    content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
 
     let body = serde_json::json!({
         "model": model,
@@ -540,7 +516,7 @@ async fn openai_compat_text_extract(text: &str, config: &AiConfig) -> Result<Doc
         "model": model,
         "temperature": config.temperature,
         "messages": [
-            {"role": "system", "content": TEXT_SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": format!("Document text:\n\n{}\n\nExtract metadata JSON.", text)}
         ],
         "response_format": {"type": "json_object"}
@@ -586,7 +562,7 @@ async fn openai_compat_vision_extract(
     let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
 
     let mut content_parts = Vec::new();
-    content_parts.push(serde_json::json!({"type": "text", "text": VISION_SYSTEM_PROMPT}));
+    content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
 
     for (path, buffer) in file_buffers {
         let ext = file_extension(path);
@@ -632,19 +608,29 @@ fn data_to_metadata(data: &HashMap<String, serde_json::Value>) -> DocumentMetada
 
     DocumentMetadata {
         company_name: data
-            .get("company_name")
+            .get("company")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .unwrap_or("Unknown")
             .to_string(),
         document_date: data
-            .get("document_date")
+            .get("date")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
         document_type: data
-            .get("document_type")
+            .get("doctype")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .unwrap_or("Unknown")
+            .to_string(),
+        category: data
+            .get("category")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown")
+            .to_string(),
+        subject: data
+            .get("subject")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown")
             .to_string(),
         confidence,
         invoice_number: data

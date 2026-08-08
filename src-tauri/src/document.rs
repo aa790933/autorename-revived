@@ -259,6 +259,8 @@ pub fn generate_filename(
     company: &str,
     doctype: &str,
     date_str: &str,
+    category: &str,
+    subject: &str,
     config: &NamingConfig,
     original_filename: &str,
 ) -> String {
@@ -284,15 +286,24 @@ pub fn generate_filename(
 
     let clean_company = sanitize_filename(company, 48);
     let clean_doctype = sanitize_filename(doctype, 48);
+    let clean_category = sanitize_filename(category, 48);
+    let clean_subject = sanitize_filename(subject, 48);
+
+    let original_stem = Path::new(original_filename)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+
+    let seq_width = config.sequence_zerofill as usize;
 
     let fields: HashMap<String, String> = [
         ("date".to_string(), date_formatted.clone()),
         ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
         ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
-        ("category".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
-        ("subject".to_string(), if company.is_empty() && doctype.is_empty() { "Unknown".to_string() } else { company.to_string() }),
-        ("original".to_string(), Path::new(original_filename).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "file".to_string())),
-        ("sequence".to_string(), "01".to_string()),
+        ("category".to_string(), if clean_category.is_empty() { "Unknown".to_string() } else { clean_category.clone() }),
+        ("subject".to_string(), if clean_subject.is_empty() { "Unknown".to_string() } else { clean_subject.clone() }),
+        ("original".to_string(), original_stem.clone()),
+        ("sequence".to_string(), format!("_{:0width$}", 1, width = seq_width)),
     ]
     .into_iter()
     .collect();
@@ -307,6 +318,10 @@ pub fn generate_filename(
             ("date".to_string(), date_formatted.clone()),
             ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
             ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
+            ("category".to_string(), if clean_category.is_empty() { "Unknown".to_string() } else { clean_category.clone() }),
+            ("subject".to_string(), if clean_subject.is_empty() { "Unknown".to_string() } else { clean_subject.clone() }),
+            ("original".to_string(), original_stem.clone()),
+            ("sequence".to_string(), format!("_{:0width$}", 1, width = seq_width)),
         ]
         .into_iter()
         .collect();
@@ -321,6 +336,44 @@ pub fn generate_filename(
         format!("{}{}", &result[..avail.min(result.len())], suffix)
     } else {
         format!("{}{}", result, suffix)
+    }
+}
+
+pub fn ensure_unique_filename(directory: &str, filename: &str, zerofill: u32) -> String {
+    let path = Path::new(directory).join(filename);
+    if !path.exists() {
+        return filename.to_string();
+    }
+
+    let path_obj = Path::new(filename);
+    let stem = path_obj
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename);
+    let ext = path_obj
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| format!(".{}", e))
+        .unwrap_or_default();
+
+    let seq_width = zerofill as usize;
+    let mut counter = 2u32;
+    loop {
+        let seq = format!("_{:0width$}", counter, width = seq_width);
+        let new_name = if stem.ends_with("_01") {
+            let base = stem.trim_end_matches("_01");
+            format!("{}{}{}", base, seq, ext)
+        } else {
+            format!("{}{}{}", stem, seq, ext)
+        };
+        let new_path = Path::new(directory).join(&new_name);
+        if !new_path.exists() {
+            return new_name;
+        }
+        counter += 1;
+        if counter > 9999 {
+            return new_name;
+        }
     }
 }
 

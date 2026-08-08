@@ -407,6 +407,8 @@ async fn rename_pdfs(
             &company,
             &meta.document_type,
             &date,
+            &meta.category,
+            &meta.subject,
             &config.naming,
             path,
         );
@@ -417,6 +419,12 @@ async fn rename_pdfs(
         } else {
             new_name.clone()
         };
+
+        let final_name = document::ensure_unique_filename(
+            &parent_dir,
+            &final_name,
+            config.naming.sequence_zerofill,
+        );
 
         let new_path = match resolve_safe_path(&parent_dir, &final_name) {
             Ok(p) => p,
