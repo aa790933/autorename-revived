@@ -77,13 +77,50 @@ pub struct TestConnectionResult {
 }
 
 const SYSTEM_PROMPT: &str = r#"You are an advanced AI document analyzer specialized in extracting precise metadata for automated file renaming.
-Your primary task is to analyze the provided document or image and extract data into a STRICT JSON format.
+
+Your PRIMARY directive: Extract the following fields from the document or image. NEVER return null, empty strings, or "Unknown" for fields you can reasonably infer. Use your best judgment to deduce missing information from visual context.
+
+EXTRACT THESE FIELDS:
+- "date": Document date in YYYYMMDD format. Scan for dates anywhere in the document. If no explicit date, deduce from file context or use the most plausible date. NEVER leave empty.
+- "company": The company name, sender, brand, or main entity mentioned. If the document is from/to a specific organization, extract it. If none found, summarize the main entity in 1 word.
+- "doctype": One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate. Guess based on visual layout and content patterns.
+- "category": One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax. Choose the most fitting category.
+- "subject": A very brief 2-3 word summary of the document content (e.g., "Server_Hosting", "Q3_Earnings", "Travel_Expense").
+
 CRITICAL RULES:
-1. Output ONLY valid JSON. 
-2. Do NOT wrap the JSON in markdown blocks (e.g., no ```json). Just output the raw JSON object.
-3. Keep values concise, using underscores '_' instead of spaces for multi-word values.
-4. If a field cannot be determined, use "Unknown" or the current date for dates.
-EXTRACT THE FOLLOWING FIELDS: "date" (YYYYMMDD), "company", "doctype", "category", "subject"."#;
+1. Output ONLY valid JSON — no markdown fences, no code blocks, just the raw JSON object.
+2. Use underscores '_' instead of spaces in all values.
+3. If a field cannot be determined with high confidence, use "Unknown" as a last resort, NOT null or empty string.
+4. The JSON MUST contain ALL five required fields: date, company, doctype, category, subject."#;
+
+fn gemini_response_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "OBJECT",
+        "properties": {
+            "date": {
+                "type": "STRING",
+                "description": "Document date in YYYYMMDD format. Extract from document or deduce from context. Never empty."
+            },
+            "company": {
+                "type": "STRING",
+                "description": "Company name, sender, or brand. If none, summarize the main entity in 1 word."
+            },
+            "doctype": {
+                "type": "STRING",
+                "description": "One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate."
+            },
+            "category": {
+                "type": "STRING",
+                "description": "One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax."
+            },
+            "subject": {
+                "type": "STRING",
+                "description": "Very brief 2-3 word summary of content (e.g., Server_Hosting, Q3_Earnings)."
+            }
+        },
+        "required": ["date", "company", "doctype", "category", "subject"]
+    })
+}
 
 fn clean_json_response(text: &str) -> String {
     let cleaned = text
@@ -322,7 +359,9 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
         }],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": config.temperature
+            "responseSchema": gemini_response_schema(),
+            "temperature": 0.1,
+            "maxOutputTokens": 2048
         }
     });
 
@@ -386,11 +425,18 @@ async fn gemini_vision_extract(
         }));
     }
 
+    // Explicitly tell the AI to analyze the provided image/document
+    contents.push(serde_json::json!({
+        "text": "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Do NOT output anything except the JSON object."
+    }));
+
     let body = serde_json::json!({
         "contents": [{"parts": contents}],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": config.temperature
+            "responseSchema": gemini_response_schema(),
+            "temperature": 0.1,
+            "maxOutputTokens": 2048
         }
     });
 
@@ -724,44 +770,38 @@ fn data_to_metadata(data: &HashMap<String, serde_json::Value>) -> DocumentMetada
         .unwrap_or(0.0)
         .clamp(0.0, 1.0);
 
-    DocumentMetadata {
-        company_name: data
-            .get("company")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown")
-            .to_string(),
-        document_date: data
-            .get("date")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-        document_type: data
-            .get("doctype")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown")
-            .to_string(),
-        category: data
-            .get("category")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown")
-            .to_string(),
-        subject: data
-            .get("subject")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown")
-            .to_string(),
+    let meta = DocumentMetadata {
+        company_name: extract_str_field(data, "company", "Unknown"),
+        document_date: extract_str_field(data, "date", ""),
+        document_type: extract_str_field(data, "doctype", "Unknown"),
+        category: extract_str_field(data, "category", "Unknown"),
+        subject: extract_str_field(data, "subject", "Unknown"),
         confidence,
-        invoice_number: data
-            .get("invoice_number")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-        total_amount: data
-            .get("total_amount")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-    }
+        invoice_number: extract_str_field(data, "invoice_number", ""),
+        total_amount: extract_str_field(data, "total_amount", ""),
+    };
+
+    tracing::debug!(
+        "Mapped metadata: date={}, company={}, doctype={}, category={}, subject={}",
+        meta.document_date, meta.company_name, meta.document_type, meta.category, meta.subject
+    );
+
+    meta
+}
+
+/// Safely extracts a string field from JSON data.
+/// Handles missing keys, null values, and whitespace-only strings.
+/// Returns `default_value` if the field is absent, null, or empty.
+fn extract_str_field(
+    data: &HashMap<String, serde_json::Value>,
+    key: &str,
+    default_value: &str,
+) -> String {
+    data.get(key)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| default_value.to_string())
 }
 
 pub async fn test_connection(

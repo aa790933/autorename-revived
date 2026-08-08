@@ -124,6 +124,15 @@ All fields that cannot be determined are replaced with `"Unknown"` (instead of `
 
 In `"auto"` mode, local text extraction runs first. If quality is above the threshold, the text AI is used (cheaper). If below, vision AI is used (more accurate for scanned documents).
 
+### Structured AI Extraction (responseSchema)
+
+The Gemini integration uses **Structured Outputs** via `responseSchema` in the `generationConfig`. This forces the API to return a strictly-typed JSON object with all required fields (`date`, `company`, `doctype`, `category`, `subject`). Key safeguards:
+
+1. **API-level schema enforcement** — The Gemini API validates the response against the schema before returning, guaranteeing well-formed JSON with all required fields.
+2. **Aggressive extraction prompt** — The system prompt instructs the AI to never return null/empty, and to deduce missing information from visual context.
+3. **Multi-layered Rust fallback parsing** — If the strict JSON parse fails, a regex-based fallback extracts key-value pairs from the raw text.
+4. **Safe field mapping** — Empty, null, or whitespace-only AI values are replaced with `"Unknown"` (for text fields) or `"Unknown"` (for dates), ensuring files are never named `00000000_` or `Unknown_Unknown`.
+
 ### Environment Variables
 
 Config values support `${VAR_NAME}` syntax for API keys:

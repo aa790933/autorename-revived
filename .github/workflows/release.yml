@@ -13,6 +13,7 @@ env:
   NODE_VERSION: "24"
   PNPM_VERSION: "10"
   RUST_VERSION: "stable"
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
 jobs:
   # ────────────────────────────────────────────────────────────
@@ -42,16 +43,13 @@ jobs:
           "tag=v$v" >> $env:GITHUB_OUTPUT
           Write-Output "GUI version: $v"
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4.0.0
+        uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
-          config-node-options: "--no-warnings"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "${{ env.NODE_VERSION }}"
-          cache: pnpm
-          cache-dependency-path: gui/pnpm-lock.yaml
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -61,10 +59,17 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: tauri-windows-portable
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: gui/.pnpm-store
+          key: pnpm-store-${{ hashFiles('gui/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-
       - name: Install npm deps
         shell: pwsh
         working-directory: gui
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.store-dir=.\.pnpm-store
       - name: Build frontend (CSS + TypeScript)
         shell: pwsh
         working-directory: gui
@@ -75,10 +80,6 @@ jobs:
       - name: Install Tauri CLI
         shell: pwsh
         run: cargo install tauri-cli --version "^2" --locked
-      - name: Clean stale Rust artifacts
-        shell: pwsh
-        working-directory: src-tauri
-        run: cargo clean
       - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: src-tauri
@@ -136,16 +137,13 @@ jobs:
           "VERSION=$v" >> $env:GITHUB_ENV
           Write-Output "Installer version: $v"
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4.0.0
+        uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
-          config-node-options: "--no-warnings"
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "${{ env.NODE_VERSION }}"
-          cache: pnpm
-          cache-dependency-path: gui/pnpm-lock.yaml
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -155,10 +153,17 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: tauri-windows-installer
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: gui/.pnpm-store
+          key: pnpm-store-${{ hashFiles('gui/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-
       - name: Install npm deps
         shell: pwsh
         working-directory: gui
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.store-dir=.\.pnpm-store
       - name: Build frontend (CSS + TypeScript)
         shell: pwsh
         working-directory: gui
@@ -169,10 +174,6 @@ jobs:
       - name: Install Tauri CLI
         shell: pwsh
         run: cargo install tauri-cli --version "^2" --locked
-      - name: Clean stale Rust artifacts
-        shell: pwsh
-        working-directory: src-tauri
-        run: cargo clean
       - name: Build Tauri MSI
         shell: pwsh
         working-directory: src-tauri
