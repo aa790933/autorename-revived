@@ -280,8 +280,13 @@ pub fn generate_filename(
         date_str.to_string()
     } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, r#"%Y-%m-%d"#) {
         parsed.format(&config.date_format).to_string()
+    } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, r#"%d/%m/%Y"#) {
+        parsed.format(&config.date_format).to_string()
+    } else if date_str.is_empty() {
+        // No date extracted — use "Unknown" instead of the cryptic "00000000"
+        "Unknown".to_string()
     } else {
-        "00000000".to_string()
+        "Unknown".to_string()
     };
 
     let clean_company = sanitize_filename(company, 48);

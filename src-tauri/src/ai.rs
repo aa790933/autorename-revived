@@ -117,18 +117,32 @@ fn extract_json_braces(text: &str) -> Option<String> {
 fn parse_json_response(text: &str) -> Result<HashMap<String, serde_json::Value>, String> {
     let clean_json = clean_json_response(text);
 
+    // Attempt 1: strict serde_json parse on cleaned text
     if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&clean_json) {
         return Ok(parsed);
     }
 
+    // Attempt 2: try extracting JSON braces and parsing that
     if let Some(block) = extract_json_braces(&clean_json) {
         if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&block) {
             return Ok(parsed);
         }
     }
 
+    // Attempt 3: parse the raw trimmed text directly
     if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(text.trim()) {
         return Ok(parsed);
+    }
+
+    // Attempt 4: regex-based fallback — try to extract key-value pairs from raw text
+    tracing::warn!(
+        "JSON parsing failed for AI response; falling back to regex extraction. Raw (first 500 chars): {}",
+        &text[..text.len().min(500)]
+    );
+    let regex_data = parse_with_regex_fallback(text);
+    if !regex_data.is_empty() {
+        tracing::info!("Regex fallback extracted {} fields: {:?}", regex_data.len(), regex_data.keys().collect::<Vec<_>>());
+        return Ok(regex_data);
     }
 
     Err(format!(
@@ -161,6 +175,41 @@ fn parse_gemini_response(text_resp: &str) -> Result<String, String> {
         .ok_or("No text field in response")?;
 
     Ok(result_text.to_string())
+}
+
+/// Regex-based fallback parser. If the AI response is not strictly valid JSON,
+/// this function attempts to extract individual fields by pattern-matching
+/// common JSON-like structures in the raw text.
+fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
+    let mut data = HashMap::new();
+
+    // Match "key": "value" patterns (handles both "key":"value" and "key": "value")
+    let re = regex::Regex::new(r#""(\w+)""\s*:\s*"([^"]*)""#).unwrap();
+    for caps in re.captures_iter(text) {
+        let key = caps[1].to_lowercase();
+        let val = caps[2].trim().to_string();
+        data.insert(key, serde_json::Value::String(val));
+    }
+
+    // Match "key": number patterns
+    let num_re = regex::Regex::new(r#""(\w+)""\s*:\s*([0-9]+\.?[0-9]*)"#).unwrap();
+    for caps in num_re.captures_iter(text) {
+        let key = caps[1].to_lowercase();
+        if let Ok(num) = caps[2].parse::<f64>() {
+            data.insert(key, serde_json::Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0))));
+        }
+    }
+
+    // If we still have nothing, try to extract date-like patterns
+    if data.is_empty() {
+        let date_re = regex::Regex::new(r"(\d{4})[-/\.](\d{1,2})[-/\.](\d{1,2})").unwrap();
+        if let Some(caps) = date_re.captures(text) {
+            let date = format!("{}{}{}", &caps[1], &caps[2], &caps[3]);
+            data.insert("date".to_string(), serde_json::Value::String(date));
+        }
+    }
+
+    data
 }
 
 fn guess_mime(ext: &str) -> &'static str {

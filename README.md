@@ -1,30 +1,33 @@
 <div align="center">
-  <h1>AutoRename-Revived v3.0.4</h1>
-  <p><b>AI-powered batch document renamer — native Rust backend, multi-provider LLM, and modern Tauri GUI.</b></p>
+  <h1>AutoRename-Revived v3.0.5</h1>
+  <p><b>AI-powered batch document renamer — native Rust + Tauri backend with Gemini 3.5 Flash Lite integration.</b></p>
   <p>
     <img src="https://img.shields.io/badge/rust-2021-orange?logo=rust" alt="Rust">
+    <img src="https://img.shields.io/badge/tauri-v2-blue?logo=tauri" alt="Tauri">
+    <img src="https://img.shields.io/badge/gemini-3.5--flash--lite-8E75F9?logo=google" alt="Gemini">
     <img src="https://img.shields.io/badge/platform-Windows-blue?logo=windows" alt="Windows">
     <img src="https://img.shields.io/github/license/aa790933/autorename-revived" alt="MIT">
   </p>
 </div>
 
-AutoRename-Revived extracts **company name**, **document date**, and **document type** from documents (PDF, images, DOCX, XLSX, PPTX) using AI, then renames them to a consistent `YYYYMMDD_COMPANY_DOCTYPE` format — batch processing hundreds of files in seconds.
+AutoRename-Revived extracts **company name**, **document date**, **document type**, **category**, and **subject** from documents (PDF, images, DOCX, XLSX, PPTX) using AI, then renames them to a consistent, customizable format — batch processing hundreds of files in seconds.
+
+Built with **Tauri v2** (Rust backend + TypeScript frontend) for ultra-fast performance — no Python runtime required.
 
 ---
 
-## Features
+## Overview
 
-- **Pure Rust Backend** — No Python runtime required; native AI provider routing via `reqwest` + `tokio`
-- **5 AI Providers** — Google Gemini (default), OpenAI, Anthropic, xAI (Grok), and Ollama for offline use
-- **Cloud-Native Vision** — Images and scanned PDFs analyzed via Vision LLMs; no local OCR dependency
-- **Local Text Extraction** — DOCX, XLSX, PPTX, and PDF text extraction via `lopdf` + ZIP parsing
-- **Async IPC** — Non-blocking background threads for file reading, Base64 encoding, and API calls
-- **AI Sanitization** — Regex-based cleaning strips markdown fences, code blocks, and LLM gibberish
-- **API Test Connection** — One-click provider verification in Settings (tests only the active provider)
-- **Company Harmonization** — Fuzzy matching maps OCR typos to canonical names
-- **Modern GUI** — Tauri v2 desktop app (TypeScript + Rust) with Catppuccin theme, drag-and-drop
-- **Embedded State** — Settings stored in-memory via `tauri-plugin-store`; zero external config files
-- **Portable & Installer** — Standalone EXE or MSI installer
+| Feature | Details |
+|---------|---------|
+| **Backend** | Rust + Tauri v2 (native, zero-install) |
+| **AI Engine** | Google Gemini `gemini-3.5-flash-lite` (vision + text) |
+| **Providers** | Gemini (default), OpenAI, Anthropic, xAI, Ollama, Custom |
+| **Local OCR-free** | Scanned PDFs & images analyzed via Vision LLMs |
+| **Portable** | Standalone EXE with portable settings (`.portable` marker) |
+| **Installer** | MSI installer with OS-global settings |
+
+---
 
 ## Quick Start
 
@@ -32,20 +35,160 @@ AutoRename-Revived extracts **company name**, **document date**, and **document 
 
 Download the [latest release](https://github.com/aa790933/autorename-revived/releases) and run `AutoRename-Revived.exe` — no installation required.
 
-- Drag & drop PDF files or folders onto the window
-- Preview proposed names with the **Dry Run** button
-- **Rename** with one click; **Undo** reverses the last batch
-- **Test Connection** in Settings verifies your AI provider is reachable
-- Theme: Catppuccin Macchiato (dark) / Latte (light)
+1. **Configure AI** — Open Settings, enter your Gemini API key
+2. **Test Connection** — Click "Test Connection" to verify your key works
+3. **Drag & Drop** — Drop PDF files or folders onto the window
+4. **Preview** — Click **Dry Run** to preview proposed names
+5. **Rename** — Click **Rename** to apply; **Undo** reverses the last batch
 
-### Development
+---
+
+## Custom Format Settings
+
+The renamer supports fully customizable naming templates using `{field}` placeholders. Fields are replaced with extracted AI metadata.
+
+### Available Placeholders
+
+| Placeholder | Description | Example |
+|-------------|-------------|---------|
+| `{date}` | Document date in `YYYYMMDD` format | `20240115` |
+| `{company}` | Extracted company name | `AcmeCorp` |
+| `{doctype}` | Document type (Invoice, Contract, etc.) | `Invoice` |
+| `{category}` | Document category | `Finance` |
+| `{subject}` | Document subject / title | `Q3_Report` |
+| `{original}` | Original filename stem (no extension) | `scan_001` |
+| `{sequence}` | Zero-filled sequence number | `_01`, `_02` |
+
+### Default Template
+
+```
+{date}_{company}_{doctype}
+```
+
+Example output: `20240115_AcmeCorp_Invoice_01.pdf`
+
+### Custom Template Examples
+
+**Comma-separated with category:**
+```
+{date},{company},{doctype}{category},{subject},{original}{sequence}
+```
+
+**Subject-first format:**
+```
+{subject}_{date}_{company}
+```
+
+**Simple date-prefixed:**
+```
+{date}_{subject}{sequence}
+```
+
+### Fallback Template
+
+If the AI fails to extract any metadata, the **fallback template** is used instead. By default:
+```
+{date}_Unknown_{doctype}
+```
+
+All fields that cannot be determined are replaced with `"Unknown"` (instead of `00000000`), ensuring human-readable filenames even when AI extraction fails.
+
+### Field-Specific Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `naming.date_format` | `%Y%m%d` | Chrono format for parsed dates |
+| `naming.sequence_zerofill` | `2` | Padding width for `{sequence}` |
+| `naming.max_length` | `128` | Maximum filename length |
+| `naming.separator` | `_` | Separator between fields |
+
+---
+
+## AI Providers
+
+| Provider | Text Model | Vision Model | API Key Field |
+|----------|-----------|-------------|---------------|
+| **Google Gemini** (default) | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | `ai.gemini_api_key` |
+| OpenAI | `gpt-4o-mini` | `gpt-4o` | `ai.api_key` |
+| Anthropic | `claude-3-5-haiku-latest` | `claude-sonnet-4-20250514` | `ai.api_key` |
+| Ollama | `llama3.2` | `llama3.2` | None (local) |
+| xAI | `grok-3-beta` | `grok-3-beta` | `ai.api_key` |
+| Custom | User-defined | User-defined | User-defined |
+
+### Extraction Modes
+
+| Setting | Values | Description |
+|---------|--------|-------------|
+| `pdf.vision` | `false` / `true` / `"auto"` | Whether to send images to Vision LLM |
+| `pdf.text_quality_threshold` | `0.0`–`1.0` | Triggers vision in `"auto"` mode when local text quality is below threshold |
+
+In `"auto"` mode, local text extraction runs first. If quality is above the threshold, the text AI is used (cheaper). If below, vision AI is used (more accurate for scanned documents).
+
+### Environment Variables
+
+Config values support `${VAR_NAME}` syntax for API keys:
+
+```env
+GEMINI_API_KEY=your-gemini-key-here
+OPENAI_API_KEY=sk-your-openai-key-here
+```
+
+---
+
+## Portable vs. Installer
+
+AutoRename-Revived is distributed in two editions:
+
+### Portable Edition
+
+- **File**: `AutoRename-v{version}-Portable.zip` → `AutoRename-Revived.exe`
+- **Settings location**: Stored **alongside the EXE** in the same directory as `settings.json`
+- **Portability**: Copy the entire folder to any machine — your settings travel with you
+- **Marker**: A `.portable` file next to the EXE enables portable mode
+
+```
+USB Drive / Folder:
+├── AutoRename-Revived.exe
+├── .portable          ← marker file (enables portable mode)
+├── settings.json      ← your settings live here
+└── renamed-files/
+```
+
+### Installer Edition (MSI)
+
+- **File**: `AutoRename-v{version}.msi`
+- **Settings location**: Stored in the OS standard AppData directory:
+  - `%APPDATA%\AutoRename-Revived\settings.json`
+- **Shared**: Settings are shared across reinstallations on the same machine
+- **No `.portable` marker**: Uses standard OS app data
+
+---
+
+## Building
+
+### CI/CD
+
+Push a `v*` tag to trigger `.github/workflows/release.yml`:
 
 ```bash
-# Prerequisites: Rust toolchain, Node.js 22+, pnpm
+git tag v3.0.5
+git push origin v3.0.5
+```
+
+This produces:
+- `AutoRename-v3.0.5-Portable.zip` — Standalone EXE with `.portable` marker
+- `*.msi` — Windows installer
+
+### Local Build
+
+```bash
+# Prerequisites: Rust toolchain, Node.js 24+, pnpm 10
 cd gui
 pnpm install
-pnpm tauri dev
+pnpm tauri build
 ```
+
+---
 
 ## Project Structure
 
@@ -72,8 +215,7 @@ autorename-revived/
 │   │   │   └── about.ts            # About page
 │   │   └── css/                    # Catppuccin theme, component styles
 │   ├── public/                     # Static assets
-│   ├── scripts/                    # Build scripts (colors, icons)
-│   ├── package.json                # v3.0.4, pnpm dependencies
+│   ├── package.json
 │   ├── tsconfig.json
 │   ├── vite.config.ts
 │   └── index.html
@@ -81,16 +223,17 @@ autorename-revived/
 ├── src-tauri/                      # Backend (Rust + Tauri v2)
 │   ├── src/
 │   │   ├── main.rs                 # Tauri entry point
-│   │   ├── lib.rs                  # IPC command bindings (32 commands)
-│   │   ├── ai.rs                   # AI provider routing (Gemini, OpenAI, Anthropic, Ollama, xAI, Custom)
-│   │   ├── config.rs               # AppConfig model, tauri-plugin-store persistence, env var resolution
+│   │   ├── lib.rs                  # IPC command bindings
+│   │   ├── ai.rs                   # AI provider routing (Gemini, OpenAI, etc.)
+│   │   ├── config.rs               # AppConfig model, persistence, env var resolution
 │   │   ├── document.rs             # Filename generation, undo history, path safety
-│   │   ├── extractors.rs           # Local text extraction (DOCX, XLSX, PPTX, PDF), text quality scoring
-│   │   └── file_utils.rs           # File system utilities
-│   ├── capabilities/               # Tauri permissions
+│   │   ├── extractors.rs           # Local text extraction (DOCX, XLSX, PPTX, PDF)
+│   │   ├── file_utils.rs           # File system utilities
+│   │   └── portable.rs             # Portable vs installer detection
+│   ├── dependencies/               # Tauri permissions
 │   ├── icons/                      # App icons
-│   ├── Cargo.toml                  # Rust dependencies
-│   ├── tauri.conf.json             # Tauri build config
+│   ├── Cargo.toml
+│   ├── tauri.conf.json
 │   └── build.rs
 │
 ├── .github/workflows/release.yml   # CI/CD: build → verify → release
@@ -100,74 +243,25 @@ autorename-revived/
 └── metadata.json                   # Code signing config
 ```
 
-## AI Providers
-
-| Provider | Text Model | Vision Model | API Key |
-|----------|-----------|-------------|---------|
-| **Google Gemini** (default) | `gemini-3.1-flash-lite` | `gemini-3.1-flash-lite` | `ai.gemini_api_key` |
-| OpenAI | `gpt-4o-mini` | `gpt-4o` | `ai.api_key` |
-| Anthropic | `claude-3-5-haiku-latest` | `claude-sonnet-4-20250514` | `ai.api_key` |
-| Ollama | `llama3.2` | `llama3.2` | None |
-| xAI | `grok-3-beta` | `grok-3-beta` | `ai.api_key` |
-| Custom | User-defined | User-defined | User-defined |
-
-### Extraction Modes
-
-| Setting | Values | Description |
-|---------|--------|-------------|
-| `pdf.vision` | `false` / `true` / `"auto"` | Send file images to Vision LLM |
-| `pdf.text_quality_threshold` | `0.0`–`1.0` | Triggers vision in `"auto"` mode |
-
-In `"auto"` mode, local text extraction runs first. If quality is above the threshold, the text AI is used (cheaper). If below, vision AI is used (more accurate for scanned documents).
-
-### Environment Variables
-
-Config values support `${VAR_NAME}` syntax for API keys:
-
-```env
-GEMINI_API_KEY=your-key-here
-OPENAI_API_KEY=sk-your-key-here
-```
-
-## Building
-
-### CI/CD
-
-Push a `v*` tag to trigger `.github/workflows/release.yml`:
-
-```bash
-git tag v3.0.5
-git push origin v3.0.5
-```
-
-This produces:
-- `AutoRename-v3.0.5-Portable.zip` — Standalone EXE
-- `*.msi` — Windows installer
-
-### Local Build
-
-```bash
-# Prerequisites: Rust toolchain, Node.js 22+, pnpm
-cd gui
-pnpm install
-pnpm tauri build
-```
+---
 
 ## IPC Commands
 
-The frontend communicates with the Rust backend via 32 Tauri IPC commands:
+The frontend communicates with the Rust backend via Tauri IPC commands:
 
 | Command | Purpose |
 |---------|---------|
-| `load_app_config` / `save_app_config` | Config persistence via tauri-plugin-store |
+| `load_app_config` / `save_app_config` | Config persistence |
 | `save_app_config_batch` | Batch settings update from UI |
 | `test_connection` | Test AI provider connectivity |
 | `rename_pdfs` | Main rename pipeline (read → extract → AI → rename) |
 | `undo_rename` | Undo last batch |
-| `validate_config` | Config validation on startup |
 | `get_config` / `get_config_path` / `save_config_cmd` | Config CRUD |
 | `extract_metadata_from_text` / `extract_metadata_from_vision` | Direct AI extraction |
+| `is_portable_app` / `get_settings_path` | Portability info |
 | `read_file_bytes` / `read_file_base64` | File I/O utilities |
+
+---
 
 ## License
 

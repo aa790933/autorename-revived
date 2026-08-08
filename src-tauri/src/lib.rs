@@ -3,6 +3,7 @@ mod config;
 mod document;
 mod extractors;
 mod file_utils;
+mod portable;
 
 use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
 use config::{AppConfig, ConfigBatchResult, load_config, save_config, save_config_batch};
@@ -26,6 +27,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_version,
+            is_portable_app,
+            get_settings_path,
             get_supported_extensions_list,
             load_app_config,
             save_app_config,
@@ -58,6 +61,13 @@ pub fn run() {
             validate_config,
             save_config_cmd,
         ])
+        .setup(|app| {
+            let handle = app.handle();
+            if let Err(e) = config::ensure_settings_directory(handle) {
+                tracing::warn!("Failed to create settings directory: {}", e);
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -65,6 +75,16 @@ pub fn run() {
 #[tauri::command]
 fn get_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
+fn is_portable_app() -> bool {
+    crate::portable::is_portable()
+}
+
+#[tauri::command]
+fn get_settings_path(app: tauri::AppHandle) -> String {
+    crate::config::get_store_path(&app).to_string_lossy().to_string()
 }
 
 #[tauri::command]

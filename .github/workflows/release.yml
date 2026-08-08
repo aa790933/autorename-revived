@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 env:
-  NODE_VERSION: "22"
-  PNPM_VERSION: "9.15.0"
+  NODE_VERSION: "24"
+  PNPM_VERSION: "10"
   RUST_VERSION: "stable"
 
 jobs:
@@ -106,6 +106,8 @@ jobs:
           $dir = "dist\portable"
           New-Item -ItemType Directory -Force -Path $dir
           Copy-Item "src-tauri\target\x86_64-pc-windows-msvc\release\autorename-revived-gui.exe" "$dir\AutoRename-Revived.exe" -Force
+          # Create portable marker so settings.json is stored alongside the EXE
+          Set-Content -Path "$dir\.portable" -Value "" -NoNewline
           Compress-Archive -Path "$dir\*" -DestinationPath "dist\AutoRename-v${v}-Portable.zip" -Force
           Write-Output "Portable ZIP created with $(Get-ChildItem $dir | Measure-Object | Select-Object -ExpandProperty Count) files"
       - name: Upload portable artifact

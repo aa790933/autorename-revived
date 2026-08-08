@@ -93,10 +93,23 @@ impl Default for AppConfig {
 }
 
 pub fn get_store_path(app: &tauri::AppHandle) -> PathBuf {
-    app.path()
-        .app_data_dir()
-        .expect("Failed to get app data dir")
-        .join("settings.json")
+    crate::portable::settings_path(app)
+}
+
+pub fn get_settings_directory(app: &tauri::AppHandle) -> PathBuf {
+    crate::portable::settings_dir(app)
+}
+
+pub fn is_portable_app() -> bool {
+    crate::portable::is_portable()
+}
+
+pub fn ensure_settings_directory(app: &tauri::AppHandle) -> Result<(), String> {
+    let dir = get_settings_directory(app);
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 fn resolve_env_vars(value: &str) -> String {
