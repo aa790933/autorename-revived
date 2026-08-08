@@ -86,18 +86,81 @@ CRITICAL RULES:
 EXTRACT THE FOLLOWING FIELDS: "date" (YYYYMMDD), "company", "doctype", "category", "subject"."#;
 
 fn clean_json_response(text: &str) -> String {
-    text.trim()
+    let cleaned = text
+        .trim()
         .trim_start_matches("```json")
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim()
-        .to_string()
+        .to_string();
+    cleaned
+}
+
+fn extract_json_braces(text: &str) -> Option<String> {
+    let start = text.find('{')?;
+    let mut depth = 0;
+    for (i, ch) in text[start..].chars().enumerate() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(text[start..start + i + 1].to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn parse_json_response(text: &str) -> Result<HashMap<String, serde_json::Value>, String> {
     let clean_json = clean_json_response(text);
-    serde_json::from_str::<HashMap<String, serde_json::Value>>(&clean_json)
-        .map_err(|e| format!("Failed to parse AI response as JSON: {}", e))
+
+    if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&clean_json) {
+        return Ok(parsed);
+    }
+
+    if let Some(block) = extract_json_braces(&clean_json) {
+        if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&block) {
+            return Ok(parsed);
+        }
+    }
+
+    if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(text.trim()) {
+        return Ok(parsed);
+    }
+
+    Err(format!(
+        "Failed to parse AI response as JSON. Raw response (first 500 chars): {}",
+        &text[..text.len().min(500)]
+    ))
+}
+
+fn parse_gemini_response(text_resp: &str) -> Result<String, String> {
+    let json: serde_json::Value =
+        serde_json::from_str(text_resp).map_err(|e| format!("Failed to parse API response: {}", e))?;
+
+    if let Some(error) = json.get("error") {
+        let message = error
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown API error");
+        let code = error.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
+        return Err(format!("Gemini API error (code {}): {}", code, message));
+    }
+
+    let candidates = json["candidates"]
+        .as_array()
+        .ok_or("No candidates in response — the model may not exist or the request failed")?;
+    let parts = candidates[0]["content"]["parts"]
+        .as_array()
+        .ok_or("No content parts in response")?;
+    let result_text = parts[0]["text"]
+        .as_str()
+        .ok_or("No text field in response")?;
+
+    Ok(result_text.to_string())
 }
 
 fn guess_mime(ext: &str) -> &'static str {
@@ -186,6 +249,12 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
         config.gemini_model.clone()
     };
 
+    let base_url = if config.gemini_base_url.trim().is_empty() {
+        GEMINI_API_BASE.to_string()
+    } else {
+        config.gemini_base_url.trim().to_string()
+    };
+
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(config.timeout))
         .build()
@@ -193,7 +262,7 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
 
     let url = format!(
         "{}/v1beta/models/{}:generateContent?key={}",
-        GEMINI_API_BASE, model, api_key
+        base_url, model, api_key
     );
 
     let body = serde_json::json!({
@@ -216,13 +285,10 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
         .map_err(|e| e.to_string())?;
 
     let text_resp = resp.text().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = serde_json::from_str(&text_resp).map_err(|e| e.to_string())?;
+    tracing::info!("Gemini text response (truncated): {}", &text_resp[..text_resp.len().min(500)]);
+    let result_text = parse_gemini_response(&text_resp)?;
 
-    let candidates = json["candidates"].as_array().ok_or("No candidates in response")?;
-    let parts = candidates[0]["content"]["parts"].as_array().ok_or("No content parts")?;
-    let result_text = parts[0]["text"].as_str().ok_or("No text in response")?;
-
-    let parsed = parse_json_response(result_text)?;
+    let parsed = parse_json_response(&result_text)?;
     Ok(data_to_metadata(&parsed))
 }
 
@@ -240,6 +306,12 @@ async fn gemini_vision_extract(
         config.gemini_model.clone()
     };
 
+    let base_url = if config.gemini_base_url.trim().is_empty() {
+        GEMINI_API_BASE.to_string()
+    } else {
+        config.gemini_base_url.trim().to_string()
+    };
+
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
         .build()
@@ -247,7 +319,7 @@ async fn gemini_vision_extract(
 
     let url = format!(
         "{}/v1beta/models/{}:generateContent?key={}",
-        GEMINI_API_BASE, model, api_key
+        base_url, model, api_key
     );
 
     let mut contents = Vec::new();
@@ -281,13 +353,10 @@ async fn gemini_vision_extract(
         .map_err(|e| e.to_string())?;
 
     let text_resp = resp.text().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = serde_json::from_str(&text_resp).map_err(|e| e.to_string())?;
+    tracing::info!("Gemini vision response (truncated): {}", &text_resp[..text_resp.len().min(500)]);
+    let result_text = parse_gemini_response(&text_resp)?;
 
-    let candidates = json["candidates"].as_array().ok_or("No candidates in response")?;
-    let parts = candidates[0]["content"]["parts"].as_array().ok_or("No content parts")?;
-    let result_text = parts[0]["text"].as_str().ok_or("No text in response")?;
-
-    let parsed = parse_json_response(result_text)?;
+    let parsed = parse_json_response(&result_text)?;
     Ok(data_to_metadata(&parsed))
 }
 
