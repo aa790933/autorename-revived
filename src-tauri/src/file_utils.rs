@@ -69,7 +69,7 @@ pub fn ensure_directory(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn file_size(path: &str) -> Result<u64, String> {
+pub fn get_file_size(path: &str) -> Result<u64, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     Ok(metadata.len())
 }

@@ -1,4 +1,4 @@
-use crate::ai::{AiConfig, DocumentMetadata};
+use serde::{Serialize, Deserialize};
 use crate::config::NamingConfig;
 use chrono::NaiveDate;
 use regex::Regex;
@@ -302,7 +302,7 @@ pub fn generate_filename(
         result = result.replace(&format!("{{{}}}", key), val);
     }
 
-    if result == template || result.is_empty() {
+    if result == template.as_str() || result.is_empty() {
         let fallback_fields: HashMap<String, String> = [
             ("date".to_string(), date_formatted.clone()),
             ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
@@ -423,7 +423,7 @@ pub fn undo_last_rename(
         });
     };
 
-    let entry = batches[bi].files[fi].clone();
+    let entry = batches[batch_idx].files[file_idx].clone();
 
     if !Path::new(&entry.new_path).exists() {
         return Ok(UndoResult {
@@ -436,15 +436,15 @@ pub fn undo_last_rename(
                 status: "failed".to_string(),
                 error: Some("Renamed file no longer exists".to_string()),
             }],
-            batch_id: Some(batches[bi].batch_id.clone()),
+            batch_id: Some(batches[batch_idx].batch_id.clone()),
         });
     }
 
     match fs::rename(&entry.new_path, &entry.old_path) {
         Ok(_) => {
-            batches[bi].files.remove(fi);
-            if batches[bi].files.is_empty() {
-                batches[bi].undone = true;
+            batches[batch_idx].files.remove(file_idx);
+            if batches[batch_idx].files.is_empty() {
+                batches[batch_idx].undone = true;
             }
             history.save(history_path)?;
             Ok(UndoResult {
@@ -457,7 +457,7 @@ pub fn undo_last_rename(
                     status: "restored".to_string(),
                     error: None,
                 }],
-                batch_id: Some(batches[bi].batch_id.clone()),
+                batch_id: Some(batches[batch_idx].batch_id.clone()),
             })
         }
         Err(e) => Ok(UndoResult {
@@ -470,7 +470,9 @@ pub fn undo_last_rename(
                 status: "failed".to_string(),
                 error: Some(e.to_string()),
             }],
-            batch_id: Some(batches[bi].batch_id.clone()),
+            batch_id: Some(batches[batch_idx].batch_id.clone()),
         }),
     }
 }
+
+

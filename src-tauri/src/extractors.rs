@@ -152,8 +152,9 @@ pub fn extract_text_from_pdf(bytes: &[u8]) -> Result<String, String> {
     let mut all_text = Vec::new();
 
     let pages = doc.get_pages();
-    for (page_num, _obj_id) in pages {
-        if let Ok(text) = extract_pdf_page_text(&doc, page_num) {
+    for (page_num, page_id) in pages {
+        let _ = page_num;
+        if let Ok(text) = extract_pdf_page_text(&doc, page_id) {
             if !text.is_empty() {
                 all_text.push(text);
             }
@@ -163,42 +164,29 @@ pub fn extract_text_from_pdf(bytes: &[u8]) -> Result<String, String> {
     Ok(all_text.join("\n"))
 }
 
-fn extract_pdf_page_text(doc: &lopdf::Document, page_num: u32) -> Result<String, String> {
-    let page = doc.get_page(page_num).map_err(|e| e.to_string())?;
-    let content = page.get_contents().map_err(|e| e.to_string())?;
+fn extract_pdf_page_text(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> Result<String, String> {
+    let content = doc.get_page_content(page_id).map_err(|e| e.to_string())?;
 
     let mut text = String::new();
 
-    for content_id in content {
-        let stream = doc.get_object(*content_id).map_err(|e| e.to_string())?;
-        if let lopdf::Object::Stream(stream_obj) = stream {
-            let _ = stream_obj;
-            // lopdf content streams are encoded; we extract text from the operation list
-            if let Ok(content_obj) = doc.get_object(*content_id) {
-                if let lopdf::Object::Stream(inner) = content_obj {
-                    if let Ok(decoded) = inner.decode_content() {
-                        let ops = lopdf::content::Operations::parse(&decoded);
-                        for op in ops {
-                            if op.operator == "Tj" || op.operator == "TJ" {
-                                if let Some(args) = op.operands.first() {
-                                    match args {
-                                        lopdf::Object::String(s, _) => {
-                                            text.push_str(&String::from_utf8_lossy(s.as_ref()));
-                                            text.push(' ');
-                                        }
-                                        lopdf::Object::Array(arr) => {
-                                            for item in arr {
-                                                if let lopdf::Object::String(s, _) = item {
-                                                    text.push_str(&String::from_utf8_lossy(s.as_ref()));
-                                                }
-                                            }
-                                            text.push(' ');
-                                        }
-                                        _ => {}
-                                    }
+    if let Ok(ops) = lopdf::content::Content::decode(&content) {
+        for op in &ops.operations {
+            if op.operator == "Tj" || op.operator == "TJ" {
+                if let Some(args) = op.operands.first() {
+                    match args {
+                        lopdf::Object::String(s, _) => {
+                            text.push_str(&String::from_utf8_lossy(s.as_ref()));
+                            text.push(' ');
+                        }
+                        lopdf::Object::Array(arr) => {
+                            for item in arr {
+                                if let lopdf::Object::String(s, _) = item {
+                                    text.push_str(&String::from_utf8_lossy(s.as_ref()));
                                 }
                             }
+                            text.push(' ');
                         }
+                        _ => {}
                     }
                 }
             }
@@ -416,6 +404,6 @@ fn decode_bytes_to_string(bytes: &[u8]) -> String {
     }
 
     // Try latin-1 (always succeeds, but may produce garbage)
-    let (decoded, _had_errors) = encoding_rs::mem::LATIN1.decode(bytes);
-    decoded.into_owned()
+    encoding_rs::mem::decode_latin1(bytes).into_owned()
 }
+

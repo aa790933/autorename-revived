@@ -8,12 +8,13 @@ use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
 use config::{AppConfig, ConfigBatchResult, load_config, save_config, save_config_batch};
 use document::{BatchResult, FileResult, UndoResult, resolve_safe_path};
 use file_utils::{
-    copy_file, ensure_directory, file_exists, file_size, get_file_extension, get_file_name, get_file_stem,
-    get_supported_extensions, is_image_extension, list_files_in_directory,
+    copy_file, ensure_directory, file_exists, get_file_extension, get_file_name, get_file_stem,
+    get_file_size, get_supported_extensions, is_image_extension, list_files_in_directory,
     preserve_extension, read_file_to_base64, read_file_to_bytes, recursive_find_files,
     validate_supported_extension,
 };
-use serde_json;
+use serde::{Deserialize, Serialize};
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -81,7 +82,7 @@ async fn save_app_config(app: tauri::AppHandle, config: AppConfig) -> Result<(),
     save_config(app, &config).await
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct ConfigUpdate {
     key: String,
     value: String,
@@ -598,3 +599,5 @@ async fn save_config_cmd(
     save_config(app, &cfg).await?;
     Ok(serde_json::json!({"success": true}))
 }
+
+

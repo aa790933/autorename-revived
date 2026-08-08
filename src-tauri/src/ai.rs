@@ -64,7 +64,7 @@ impl Default for DocumentMetadata {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestConnectionResult {
     pub success: bool,
     pub message: String,

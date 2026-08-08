@@ -1,5 +1,4 @@
 use crate::ai::AiConfig;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -137,11 +136,9 @@ fn resolve_config_env_vars(config: &mut AppConfig) {
 pub async fn load_config(app: tauri::AppHandle) -> Result<AppConfig, String> {
     let store_path = get_store_path(&app);
     if store_path.exists() {
-        let store = StoreBuilder::new()
-            .path(store_path.clone())
-            .build(app.clone())
-            .await
-            .map_err(|e| e.to_string())?;
+        let store = StoreBuilder::new(&app, store_path.clone())
+        .build()
+        .map_err(|e| e.to_string())?;
         if let Some(saved) = store.get("config") {
             if let Ok(mut cfg) = serde_json::from_value::<AppConfig>(saved) {
                 resolve_config_env_vars(&mut cfg);
@@ -159,16 +156,12 @@ pub async fn save_config(
     config: &AppConfig,
 ) -> Result<(), String> {
     let store_path = get_store_path(&app);
-    let store = StoreBuilder::new()
-        .path(store_path)
-        .build(app.clone())
-        .await
+    let store = StoreBuilder::new(&app, store_path)
+        .build()
         .map_err(|e| e.to_string())?;
     store
-        .set("config", serde_json::to_value(config).map_err(|e| e.to_string())?)
-        .await
-        .map_err(|e| e.to_string())?;
-    store.save().await.map_err(|e| e.to_string())?;
+    .set("config", serde_json::to_value(config).map_err(|e| e.to_string())?);
+    store.save().map_err(|e| e.to_string())?;
     Ok(())
 }
 
