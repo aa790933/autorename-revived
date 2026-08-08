@@ -91,7 +91,7 @@ fn clean_json_response(text: &str) -> String {
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim()
-    .to_string()
+        .to_string()
 }
 
 fn parse_json_response(text: &str) -> Result<HashMap<String, serde_json::Value>, String> {
