@@ -714,6 +714,5 @@ fn reset_cancel_flag() {
 fn is_cancelled() -> bool {
     CANCEL_RENAME.load(Ordering::SeqCst)
 }
-}
 
 
