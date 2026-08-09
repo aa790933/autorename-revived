@@ -81,7 +81,7 @@ export async function applyCachedRenames(
       skipped++;
       results.push(cached
         ? { ...cached, status: 'skipped' }
-        : { file: entry.path, status: 'skipped', new_name: null, new_path: null, error: null, warnings: [], company: null, date: null, doc_type: null, provider: null, model: null },
+        : { file: entry.path, status: 'skipped', new_name: null, new_path: null, error: null, warnings: [], company: null, date: null, doc_type: null, provider: null, model: null, suggestion_names: [], suggestion_languages: [] },
       );
       continue;
     }

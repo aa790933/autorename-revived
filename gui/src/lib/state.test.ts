@@ -42,6 +42,8 @@ function makeBatchResult(
       doc_type: null,
       provider: null,
       model: null,
+      suggestion_names: [],
+      suggestion_languages: [],
     })),
   };
 }

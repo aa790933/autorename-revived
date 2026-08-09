@@ -126,7 +126,7 @@ function renderFileRow(f: FileEntry): string {
       const suggestionItems = suggestionNames.map((s, i) => {
         const lang = suggestionLanguages[i] || '';
         const label = lang ? `${lang}` : `Option ${i + 1}`;
-        return `<button type="button" class="fq-suggestion-btn" data-file="${escapeHtml(f.path)}" data-name="${escapeHtml(s)}" title="Use this name">${escapeHtml(s)}</button>`;
+        return `<button type="button" class="fq-suggestion-btn" data-file="${escapeHtml(f.path)}" data-name="${escapeHtml(s)}" title="${escapeHtml(label)}">${escapeHtml(s)}</button>`;
       }).join('');
       suggestionsHtml = `
         <div class="fq-suggestions">
@@ -221,7 +221,9 @@ function renderFileList(state: AppState): void {
     btn.addEventListener('click', () => {
       const filePath = (btn as HTMLElement).dataset.file;
       const newName = (btn as HTMLElement).dataset.name;
-      selectSuggestion(filePath, newName);
+      if (filePath && newName) {
+        selectSuggestion(filePath, newName);
+      }
     });
   });
 }
@@ -234,8 +236,12 @@ function selectSuggestion(filePath: string, newName: string): void {
   const currentState = getState();
   const updatedFiles = currentState.files.map((entry) => {
     if (entry.path !== filePath) return entry;
+    // Compute new_path from parent_dir + new_name
+    const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+    const parentDir = lastSep >= 0 ? filePath.slice(0, lastSep + 1) : '';
+    const newPath = parentDir + newName;
     const updatedResult = entry.result
-      ? { ...entry.result, new_name: newName, new_path: null, status: 'preview' as const }
+      ? { ...entry.result, new_name: newName, new_path: newPath }
       : undefined;
     return { ...entry, result: updatedResult };
   });
