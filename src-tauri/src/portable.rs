@@ -24,14 +24,12 @@ fn portable_marker_path() -> Option<PathBuf> {
 /// - Installer: the OS standard app_data_dir
 pub fn settings_dir(app: &tauri::AppHandle) -> PathBuf {
     if is_portable() {
-        // Use the executable's parent directory
         let exe = std::env::current_exe()
             .expect("Failed to get current executable path");
         exe.parent()
             .expect("Failed to get executable parent directory")
             .to_path_buf()
     } else {
-        // Use the standard OS app_data_dir
         app.path()
             .app_data_dir()
             .expect("Failed to get app data dir")

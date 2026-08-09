@@ -37,8 +37,9 @@ export interface ConfigData {
     gemini_base_url: string;
     custom_model: string;
     custom_base_url: string;
-    temperature: number;
+     temperature: number;
     timeout: number;
+    system_prompt: string;
   };
   pdf: {
     vision: string;
@@ -74,8 +75,9 @@ const DEFAULT_CONFIG: ConfigData = {
     gemini_base_url: '',
     custom_model: '',
     custom_base_url: '',
-    temperature: 0.0,
+     temperature: 0.0,
     timeout: 30,
+    system_prompt: '',
   },
   pdf: {
     vision: 'auto',

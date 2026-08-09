@@ -1,7 +1,7 @@
 import { getState, subscribe, addFiles, clearFiles, setState, updateFileStatuses } from '../lib/state';
 import { setupDragDrop } from '../lib/dnd';
 import { pickFiles, pickFolder } from '../lib/filepicker';
-import { renamePdfs, undoRename, isErrorResult, getUndoLogDir } from '../lib/sidecar';
+import { renamePdfs, undoRename, cancelRename, isErrorResult, getUndoLogDir } from '../lib/sidecar';
 import { applyCachedRenames } from '../lib/rename-cache';
 import { getConfigSync } from '../lib/config-store';
 import { showToast } from '../lib/toast';
@@ -180,12 +180,16 @@ function renderFileList(state: AppState): void {
   } else {
     const noFiles = pendingCount === 0;
     const blocked = busy || noFiles || !!state.statusError;
+    const cancelDisabled = !busy;
     actionsHtml = `
       <div class="fq-actions-left">
         <button class="btn btn-secondary btn-sm" id="btn-dry-run" ${blocked ? 'disabled' : ''}>Dry Run</button>
         <button class="btn btn-primary btn-sm" id="btn-rename" ${blocked ? 'disabled' : ''}>
           Rename ${pendingCount} File${pendingCount !== 1 ? 's' : ''}
         </button>
+      </div>
+      <div class="fq-actions-right">
+        <button class="btn btn-error btn-sm" id="btn-cancel" ${cancelDisabled ? 'disabled' : ''}>Cancel</button>
       </div>`;
   }
 
@@ -209,6 +213,7 @@ function renderFileList(state: AppState): void {
   // Bind actions
   document.getElementById('btn-dry-run')?.addEventListener('click', () => runRename(true));
   document.getElementById('btn-rename')?.addEventListener('click', () => runRename(false));
+  document.getElementById('btn-cancel')?.addEventListener('click', handleCancel);
   document.getElementById('btn-clear')?.addEventListener('click', () => clearFiles());
   document.getElementById('btn-undo')?.addEventListener('click', handleUndo);
   document.getElementById('btn-add-more')?.addEventListener('click', async () => {
@@ -366,6 +371,12 @@ async function runRename(dryRun: boolean): Promise<void> {
       showToast(w, 'warning');
     }
   }
+}
+
+function handleCancel(): void {
+  cancelRename();
+  setState({ processing: true, progress: 'Cancelling...' });
+  showToast('Cancelling rename operation...', 'info');
 }
 
 async function handleUndo(): Promise<void> {

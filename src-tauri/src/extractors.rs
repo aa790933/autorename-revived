@@ -44,7 +44,6 @@ pub fn is_pdf_extension(path: &str) -> bool {
 }
 
 /// Assess text quality on a 0.0-1.0 scale.
-/// Higher means more readable/extractable text.
 pub fn assess_text_quality(text: &str) -> f64 {
     if text.is_empty() {
         return 0.0;
@@ -91,7 +90,6 @@ pub fn extract_text_from_xlsx(bytes: &[u8]) -> Result<String, String> {
 
     let mut shared_strings: Vec<String> = Vec::new();
 
-    // Read shared strings if present
     if let Ok(mut file) = archive.by_name("xl/sharedStrings.xml") {
         let mut xml = String::new();
         file.read_to_string(&mut xml)
@@ -101,7 +99,6 @@ pub fn extract_text_from_xlsx(bytes: &[u8]) -> Result<String, String> {
 
     let mut all_text = Vec::new();
 
-    // Read worksheet files
     for i in 0..archive.len() {
         let name = archive.by_index(i).map_err(|e| e.to_string())?.name().to_string();
         if name.starts_with("xl/worksheets/sheet") && name.ends_with(".xml") {
@@ -152,8 +149,7 @@ pub fn extract_text_from_pdf(bytes: &[u8]) -> Result<String, String> {
     let mut all_text = Vec::new();
 
     let pages = doc.get_pages();
-    for (page_num, page_id) in pages {
-        let _ = page_num;
+    for (_, page_id) in pages {
         if let Ok(text) = extract_pdf_page_text(&doc, page_id) {
             if !text.is_empty() {
                 all_text.push(text);
@@ -262,7 +258,6 @@ fn extract_shared_strings(xml: &str) -> Vec<String> {
         }
     }
 
-    // Simpler approach: use tag stripping on the whole XML
     if strings.is_empty() {
         let stripped = extract_xml_text(xml);
         return stripped
@@ -282,7 +277,6 @@ fn extract_sheet_text(xml: &str, shared_strings: &[String]) -> String {
     let mut value_buf = String::new();
     let mut cell_type = String::new();
 
-    // Simple state machine parser for worksheet XML
     let mut tag_buf = String::new();
     let mut in_tag = false;
 
@@ -297,10 +291,8 @@ fn extract_sheet_text(xml: &str, shared_strings: &[String]) -> String {
                 let tag = tag_buf.trim();
 
                 if tag == "/v" {
-                    // End of value
                     if !value_buf.is_empty() {
                         if cell_type == "s" {
-                            // Shared string reference
                             if let Ok(idx) = value_buf.trim().parse::<usize>() {
                                 if let Some(s) = shared_strings.get(idx) {
                                     current_row.push(s.clone());
@@ -322,7 +314,6 @@ fn extract_sheet_text(xml: &str, shared_strings: &[String]) -> String {
                         current_row = Vec::new();
                     }
                 } else if tag == "/c" || tag.starts_with("/c ") {
-                    // End of cell, value already processed
                 }
 
                 tag_buf.clear();
@@ -337,7 +328,6 @@ fn extract_sheet_text(xml: &str, shared_strings: &[String]) -> String {
         }
     }
 
-    // Flush last row
     if !current_row.is_empty() {
         rows.push(current_row.join("\t"));
     }
@@ -391,19 +381,16 @@ pub fn extract_text_from_file(path: &str) -> Result<(String, f64, String), Strin
 
 /// Decode bytes to string using encoding detection.
 fn decode_bytes_to_string(bytes: &[u8]) -> String {
-    // Try UTF-8 first
     if let Ok(text) = std::str::from_utf8(bytes) {
         return text.to_string();
     }
 
-    // Try UTF-8 BOM
     if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
         if let Ok(text) = std::str::from_utf8(&bytes[3..]) {
             return text.to_string();
         }
     }
 
-    // Try latin-1 (always succeeds, but may produce garbage)
     encoding_rs::mem::decode_latin1(bytes).into_owned()
 }
 

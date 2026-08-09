@@ -4,7 +4,7 @@ import { loadConfig, saveConfig, type ConfigData } from '../lib/config-store';
 import { showToast } from '../lib/toast';
 import { escapeHtml } from '../lib/utils';
 
-type FieldType = 'string' | 'secret' | 'number' | 'toggle' | 'auto-or-bool';
+type FieldType = 'string' | 'secret' | 'number' | 'toggle' | 'auto-or-bool' | 'textarea';
 
 interface FieldDef {
   key: string;
@@ -46,10 +46,12 @@ const PROVIDER_DEFS: Record<string, { label: string; icon: string; fields: Field
 const COMMON_AI_FIELDS: FieldDef[] = [
   { key: 'temperature', label: 'Temperature', type: 'number', hint: '0.0 = deterministic, 1.0 = creative', configKey: 'ai' },
   { key: 'timeout', label: 'Timeout (seconds)', type: 'number', configKey: 'ai' },
+  { key: 'system_prompt', label: 'AI System Prompt', type: 'textarea', hint: 'Customize instructions given to the AI for metadata extraction. Leave empty to use the default prompt.', configKey: 'ai' },
 ];
 
 const DOCUMENT_FIELDS: FieldDef[] = [
   { key: 'vision', label: 'Vision (scanned docs)', type: 'auto-or-bool', hint: 'auto = use AI vision for scanned pages', configKey: 'pdf' },
+  { key: 'vision_provider', label: 'Vision Provider', type: 'string', hint: 'AI provider for image/vision extraction (e.g. gemini, openai, anthropic)', configKey: 'pdf' },
 ];
 
 const NAMING_FIELDS: FieldDef[] = [
@@ -125,6 +127,8 @@ function renderInput(def: FieldDef, value: unknown, fullKey: string): string {
     case 'string':
     default:
       return `<input id="${id}" type="text" class="input input-sm" value="${escapeHtml(strVal)}" autocomplete="off">`;
+    case 'textarea':
+      return `<textarea id="${id}" class="input input-sm" rows="6" autocomplete="off">${escapeHtml(strVal)}</textarea>`;
   }
 }
 
@@ -330,7 +334,7 @@ async function saveAllSettings(): Promise<void> {
     let rawValue: string;
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
       rawValue = el.checked ? 'true' : 'false';
-    } else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+     } else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
       rawValue = el.value;
     } else {
       continue;

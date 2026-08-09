@@ -95,6 +95,10 @@ export async function renamePdfs(
   }
 }
 
+export function cancelRename(): Promise<boolean> {
+  return invoke<boolean>('cancel_rename');
+}
+
 export async function undoRename(batchId?: string): Promise<UndoResult | ErrorResult> {
   try {
     const result = await invoke<UndoResult>('undo_rename', { batchId });

@@ -263,7 +263,12 @@
   gap: 0.5rem;
 }
 
-.fq-actions-left {
+  .fq-actions-left {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.fq-actions-right {
   display: flex;
   gap: 0.375rem;
 }

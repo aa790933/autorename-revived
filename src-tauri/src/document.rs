@@ -140,10 +140,8 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
 
     let invalid_fs_chars = Regex::new(r#"[\x00-\x1f\\/:*?\"<>|]"#).unwrap();
     let unicode_control = Regex::new(r#"[\u200b-\u200f\u2028-\u202f\u2060-\u2064\ufeff\u00ad]"#).unwrap();
-    let gibberish_hex = Regex::new(r#"\b[0-9a-f]{8,}\b"#).unwrap();
-    let gibberish_long_num = Regex::new(r#"\b\d{6,}\b"#).unwrap();
-    let _leading_trailing = Regex::new(r#"^[\W_]+|[\W_]+$"#).unwrap();
-    let _multi_sep = Regex::new(r#"[_ \-]{2,}"#).unwrap();
+    let gibberish_hex = Regex::new(r#"\b[0-9]*[a-f][0-9a-f]{11,}\b"#).unwrap();
+    let multi_sep = Regex::new(r#"[_ \-]{2,}"#).unwrap();
 
     let reserved_names = [
         "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6",
@@ -154,28 +152,36 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
     let cleaned = unicode_control.replace_all(name, "");
     let cleaned = invalid_fs_chars.replace_all(&cleaned, "_");
     let cleaned = gibberish_hex.replace_all(&cleaned, "_");
-    let cleaned = gibberish_long_num.replace_all(&cleaned, "_");
+    let cleaned = multi_sep.replace_all(&cleaned, "_");
     let cleaned = cleaned.trim_matches(' ').trim_matches('.');
 
     let parts: Vec<&str> = cleaned.split('_').filter(|s| !s.is_empty()).collect();
-    let mut cleaned = parts.join("_");
-    if cleaned.is_empty() {
-        cleaned = String::from("_");
-    }
+    let cleaned = parts.join("_");
+    let cleaned = if cleaned.is_empty() {
+        String::from("_")
+    } else {
+        cleaned
+    };
 
-    if cleaned.starts_with('.') {
-        cleaned = format!("_{}", &cleaned[1..]);
-    }
+    let cleaned = if cleaned.starts_with('.') {
+        format!("_{}", &cleaned[1..])
+    } else {
+        cleaned
+    };
 
-    if cleaned.len() > max_length {
-        cleaned = cleaned[..max_length].to_string();
-    }
+    let cleaned = if cleaned.len() > max_length {
+        cleaned[..max_length].to_string()
+    } else {
+        cleaned
+    };
 
     let stem = cleaned.rsplit('.').nth(1).unwrap_or(&cleaned);
     let stem_lower = stem.to_lowercase();
-    if reserved_names.contains(&stem_lower.as_str()) {
-        cleaned = format!("_{}", cleaned);
-    }
+    let cleaned = if reserved_names.contains(&stem_lower.as_str()) {
+        format!("_{}", cleaned)
+    } else {
+        cleaned
+    };
 
     cleaned
 }
@@ -287,7 +293,6 @@ pub fn generate_filename(
     } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, r#"%d/%m/%Y"#) {
         parsed.format(&config.date_format).to_string()
     } else if date_str.is_empty() {
-        // No date extracted — use "Unknown" instead of the cryptic "00000000"
         "Unknown".to_string()
     } else {
         "Unknown".to_string()

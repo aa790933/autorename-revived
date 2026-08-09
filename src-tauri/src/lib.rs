@@ -15,7 +15,10 @@ use file_utils::{
     validate_supported_extension,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
+
+static CANCEL_RENAME: AtomicBool = AtomicBool::new(false);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -56,6 +59,7 @@ pub fn run() {
             undo_last_rename_cmd,
             rename_pdfs,
             undo_rename,
+            cancel_rename,
             get_config,
             get_config_path,
             validate_config,
@@ -241,11 +245,7 @@ fn save_rename_to_history_cmd(
     new_path: String,
     batch_id: String,
 ) -> Result<(), String> {
-    let history_path = app
-        .path()
-        .app_data_dir()
-        .expect("Failed to get app data dir")
-        .join("rename_history.json");
+    let history_path = config::get_settings_directory(&app).join("rename_history.json");
     document::save_rename_to_history(&old_path, &new_path, &history_path, &batch_id)
 }
 
@@ -254,11 +254,7 @@ fn undo_last_rename_cmd(
     app: tauri::AppHandle,
     batch_id: Option<String>,
 ) -> Result<UndoResult, String> {
-    let history_path = app
-        .path()
-        .app_data_dir()
-        .expect("Failed to get app data dir")
-        .join("rename_history.json");
+    let history_path = config::get_settings_directory(&app).join("rename_history.json");
     document::undo_last_rename(&history_path, batch_id.as_deref().unwrap_or(""))
 }
 
@@ -268,6 +264,7 @@ async fn rename_pdfs(
     paths: Vec<String>,
     options: serde_json::Value,
 ) -> Result<BatchResult, String> {
+    reset_cancel_flag();
     let dry_run = options
         .get("dryRun")
         .and_then(|v| v.as_bool())
@@ -283,6 +280,15 @@ async fn rename_pdfs(
     if let Some(ref prov) = provider_override {
         ai_config.provider = prov.clone();
     }
+
+    let vision_ai_config = {
+        let mut vc = config.ai.clone();
+        vc.provider = config.pdf.vision_provider.clone();
+        if let Some(ref prov) = provider_override {
+            vc.provider = prov.clone();
+        }
+        vc
+    };
 
     let batch_id = format!(
         "gui-{}",
@@ -301,12 +307,38 @@ async fn rename_pdfs(
     };
 
     for path in &paths {
+        if is_cancelled() {
+            result.files.push(FileResult {
+                file: path.clone(),
+                status: "failed".to_string(),
+                new_name: None,
+                new_path: None,
+                error: Some("Rename cancelled by user".to_string()),
+                warnings: vec![],
+                company: None,
+                date: None,
+                doc_type: None,
+                provider: None,
+                model: None,
+                suggestion_names: vec![],
+                suggestion_languages: vec![],
+            });
+            result.failed += 1;
+            continue;
+        }
+
         let parent_dir = std::path::Path::new(path)
             .parent()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        let file_bytes = match std::fs::read(path) {
+        let file_bytes = match tokio::task::spawn_blocking({
+            let path = path.clone();
+            move || std::fs::read(path)
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        {
             Ok(b) => b,
             Err(e) => {
                 result.files.push(FileResult {
@@ -332,33 +364,33 @@ async fn rename_pdfs(
         let use_vision = match config.pdf.vision.as_str() {
             "true" => true,
             "false" => false,
-            _ => false, // auto: decide based on file type and text quality
+            _ => false,
         };
 
         let current_model = ai::get_model_name(&ai_config);
-
-        // Build the list of languages: primary + suggestions
         let languages = ai::get_all_languages(
             &config.naming.primary_language,
             &config.naming.suggestion_languages,
         );
 
-        // Extract metadata (once per language)
         let all_metadata: Vec<ai::DocumentMetadata> = if extractors::is_image_extension(path) {
-            // Images always go through vision
             ai::extract_metadata_vision_multi(
                 &[(path.clone(), file_bytes.clone())],
-                &ai_config,
+                &vision_ai_config,
                 &languages,
             )
             .await
         } else if extractors::is_text_extension(path) {
-            // Pure text files: read as text, send to text AI
             let text = String::from_utf8_lossy(&file_bytes).to_string();
             ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
         } else if extractors::is_office_extension(path) || extractors::is_pdf_extension(path) {
-            // DOCX/XLSX/PPTX/PDF: try local extraction first
-            match extractors::extract_text_from_file(path) {
+            let local_result = tokio::task::spawn_blocking({
+                let file_path = path.clone();
+                move || extractors::extract_text_from_file(&file_path)
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+            match local_result {
                 Ok((text, quality, method)) => {
                     tracing::info!(
                         "Local extraction for {}: method={}, quality={:.2}",
@@ -367,13 +399,11 @@ async fn rename_pdfs(
                         quality
                     );
                     if quality >= config.pdf.text_quality_threshold && !use_vision {
-                        // Good quality text, use text AI
                         ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
                     } else {
-                        // Poor quality or vision forced, use vision AI
                         ai::extract_metadata_vision_multi(
                             &[(path.clone(), file_bytes.clone())],
-                            &ai_config,
+                            &vision_ai_config,
                             &languages,
                         )
                         .await
@@ -381,26 +411,23 @@ async fn rename_pdfs(
                 }
                 Err(e) => {
                     tracing::warn!("Local extraction failed for {}: {}", path, e);
-                    // Fallback: send raw bytes to vision
                     ai::extract_metadata_vision_multi(
                         &[(path.clone(), file_bytes.clone())],
-                        &ai_config,
+                        &vision_ai_config,
                         &languages,
                     )
                     .await
                 }
             }
         } else {
-            // Unknown type: try vision
             ai::extract_metadata_vision_multi(
                 &[(path.clone(), file_bytes.clone())],
-                &ai_config,
+                &vision_ai_config,
                 &languages,
             )
             .await
         };
 
-        // The first result is the primary language; the rest are suggestions
         let primary_meta = all_metadata.first().cloned().unwrap_or_default();
         let suggestion_metas: Vec<ai::DocumentMetadata> = all_metadata.into_iter().skip(1).collect();
 
@@ -431,7 +458,6 @@ async fn rename_pdfs(
             path,
         );
 
-        // Generate suggestion names for additional languages
         let suggestion_names: Vec<String> = suggestion_metas
             .iter()
             .filter_map(|sm| {
@@ -498,7 +524,10 @@ async fn rename_pdfs(
             }
         };
 
-        // No-op detection: if source path normalizes to same as target, skip
+        if src_normalized == dst_normalized
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
         let src_normalized = std::path::Path::new(path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -535,12 +564,19 @@ async fn rename_pdfs(
         }
 
         if !dry_run {
-            if let Err(e) = document::apply_rename(path, &new_path, false) {
+            let old_path = path.clone();
+            let new_path_clone = new_path.clone();
+            if let Err(e) = tokio::task::spawn_blocking(move || {
+                document::apply_rename(&old_path, &new_path_clone, false)
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            {
                 result.files.push(FileResult {
                     file: path.clone(),
                     status: "failed".to_string(),
                     new_name: Some(final_name),
-                    new_path: Some(new_path),
+                    new_path: Some(new_path_clone.clone()),
                     error: Some(e),
                     warnings: ai_warning.iter().cloned().collect(),
                     company: Some(company.clone()),
@@ -556,12 +592,16 @@ async fn rename_pdfs(
             }
 
             if config.undo.enabled {
-                let history_path = app
-                    .path()
-                    .app_data_dir()
-                    .expect("Failed to get app data dir")
-                    .join("rename_history.json");
-                if let Err(e) = document::save_rename_to_history(path, &new_path, &history_path, &batch_id) {
+                let history_path = config::get_settings_directory(&app).join("rename_history.json");
+                let old_path = path.clone();
+                let new_path_clone2 = new_path.clone();
+                let batch_id_clone = batch_id.clone();
+                if let Err(e) = tokio::task::spawn_blocking(move || {
+                    document::save_rename_to_history(&old_path, &new_path_clone2, &history_path, &batch_id_clone)
+                })
+                .await
+                .map_err(|e| e.to_string())?
+                {
                     tracing::warn!("Failed to save undo history: {}", e);
                 }
             }
@@ -586,6 +626,7 @@ async fn rename_pdfs(
     }
 
     result.success = result.failed == 0;
+    reset_cancel_flag();
     Ok(result)
 }
 
@@ -594,11 +635,7 @@ async fn undo_rename(
     app: tauri::AppHandle,
     batch_id: Option<String>,
 ) -> Result<UndoResult, String> {
-    let history_path = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("rename_history.json");
+    let history_path = config::get_settings_directory(&app).join("rename_history.json");
     document::undo_last_rename(&history_path, batch_id.as_deref().unwrap_or(""))
 }
 
@@ -662,6 +699,21 @@ async fn save_config_cmd(
     config::apply_config_update(&mut cfg, &key, &value).map_err(|e| e.to_string())?;
     save_config(app, &cfg).await?;
     Ok(serde_json::json!({"success": true}))
+}
+
+#[tauri::command]
+fn cancel_rename() -> bool {
+    CANCEL_RENAME.store(true, Ordering::SeqCst);
+    true
+}
+
+fn reset_cancel_flag() {
+    CANCEL_RENAME.store(false, Ordering::SeqCst);
+}
+
+fn is_cancelled() -> bool {
+    CANCEL_RENAME.load(Ordering::SeqCst)
+}
 }
 
 

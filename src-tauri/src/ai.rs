@@ -22,6 +22,12 @@ pub struct AiConfig {
     pub custom_base_url: String,
     pub temperature: f64,
     pub timeout: u64,
+    #[serde(default = "default_system_prompt")]
+    pub system_prompt: String,
+}
+
+fn default_system_prompt() -> String {
+    SYSTEM_PROMPT.to_string()
 }
 
 impl Default for AiConfig {
@@ -37,6 +43,7 @@ impl Default for AiConfig {
             custom_base_url: String::new(),
             temperature: 0.0,
             timeout: 30,
+            system_prompt: default_system_prompt(),
         }
     }
 }
@@ -86,14 +93,14 @@ pub struct TestConnectionResult {
 
 const SYSTEM_PROMPT: &str = r#"You are an advanced AI document analyzer specialized in extracting precise metadata for automated file renaming.
 
-Your PRIMARY directive: Extract the following fields from the document or image. NEVER return null, empty strings, or "Unknown" for fields you can reasonably infer. Use your best judgment to deduce missing information from visual context.
+Your PRIMARY directive: Read and analyze the ENTIRE document/image thoroughly before extracting fields. Scan all pages and regions — header, body, footer, stamps, watermarks, signatures, tables, and fine print. Do not miss or skip any content. NEVER return null, empty strings, or "Unknown" for fields you can reasonably infer.
 
 EXTRACT THESE FIELDS:
-- "date": Document date in YYYYMMDD format. Scan for dates anywhere in the document. If no explicit date, deduce from file context or use the most plausible date. NEVER leave empty.
-- "company": The company name, sender, brand, or main entity mentioned. If the document is from/to a specific organization, extract it. If none found, summarize the main entity in 1 word.
-- "doctype": One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate. Guess based on visual layout and content patterns.
-- "category": One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax. Choose the most fitting category.
-- "subject": A very brief 2-3 word summary of the document content (e.g., "Server_Hosting", "Q3_Earnings", "Travel_Expense"). If you CANNOT read or see the document provided, return "ERROR_CANNOT_SEE_FILE" in the subject field.
+- "date": Document date in YYYYMMDD format. Find the date the document was ISSUED, SIGNED, or EFFECTIVE — NOT publication dates, copyright dates, footer stamps, or "according to law" dates. If the document has multiple dates, choose the primary issue/signature/effective date. If no explicit date, deduce from context. NEVER leave empty.
+- "company": The FULL legal name of the issuing/sending organization, sender, or main entity. Look for company letterheads, sender blocks, "Issued by:", "From:", authority names, ministry/department names. Extract the complete entity name (e.g., "Ministry_of_Finance", "Algeria_Public_Works_Director"). If none found, summarize in 1 word.
+- "doctype": One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Tender, Bid, Agreement, Permit, License, Order, Statement. Guess based on document layout and content patterns. Look for document titles like "CONTRACT", "TENDER", "AGREEMENT" at the top.
+- "category": One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government. Choose the most fitting.
+- "subject": A concise 3-5 word description capturing the document's specific purpose or subject matter (e.g., "Road_Construction_Contract", "IT_Services_Agreement", "Q3_Financial_Report"). Include key identifiers like project names, contract numbers, or specific topics. If you CANNOT read the document, return "ERROR_CANNOT_SEE_FILE".
 
 CRITICAL RULES:
 1. Output ONLY valid JSON — no markdown fences, no code blocks, just the raw JSON object.
@@ -103,14 +110,14 @@ CRITICAL RULES:
 
 const VISION_USER_PROMPT: &str = "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.";
 
-fn build_system_prompt(language: &str) -> String {
+fn build_system_prompt(language: &str, prompt_template: &str) -> String {
     if language.eq_ignore_ascii_case("English") {
-        return SYSTEM_PROMPT.to_string();
+        return prompt_template.to_string();
     }
 
     format!(
         "{}: Output all metadata field values in {} language. For doctype, use the {} translation of document type names (e.g., Invoice, Receipt, Contract, etc.). For category, use the {} translation of category names (e.g., Finance, Personal, Work, etc.).",
-        SYSTEM_PROMPT,
+        prompt_template,
         language,
         language,
         language
@@ -148,23 +155,23 @@ fn gemini_response_schema() -> serde_json::Value {
         "properties": {
             "date": {
                 "type": "STRING",
-                "description": "Document date in YYYYMMDD format. Extract from document or deduce from context. Never empty."
+                "description": "Document date in YYYYMMDD format. The date the document was issued, signed, or made effective — not publication or copyright dates."
             },
             "company": {
                 "type": "STRING",
-                "description": "Company name, sender, or brand. If none, summarize the main entity in 1 word."
+                "description": "Full legal name of the issuing/sending organization. Include ministry, department, or brand names. If none, summarize the main entity in 1 word."
             },
             "doctype": {
                 "type": "STRING",
-                "description": "One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate."
+                "description": "One of: Invoice, Receipt, Contract, Tender, Bid, Agreement, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Permit, License, Order, Statement. Match the document's evident purpose."
             },
             "category": {
                 "type": "STRING",
-                "description": "One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax."
+                "description": "One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government, Other. The broadest fitting category."
             },
             "subject": {
                 "type": "STRING",
-                "description": "Very brief 2-3 word summary of content (e.g., Server_Hosting, Q3_Earnings)."
+                "description": "3-5 word summary of the document's specific subject. Include project names, contract numbers, or specific topics. Use underscores between words."
             }
         },
         "required": ["date", "company", "doctype", "category", "subject"]
@@ -203,24 +210,20 @@ fn extract_json_braces(text: &str) -> Option<String> {
 fn parse_json_response(text: &str) -> Result<HashMap<String, serde_json::Value>, String> {
     let clean_json = clean_json_response(text);
 
-    // Attempt 1: strict serde_json parse on cleaned text
     if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&clean_json) {
         return Ok(parsed);
     }
 
-    // Attempt 2: try extracting JSON braces and parsing that
     if let Some(block) = extract_json_braces(&clean_json) {
         if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&block) {
             return Ok(parsed);
         }
     }
 
-    // Attempt 3: parse the raw trimmed text directly
     if let Ok(parsed) = serde_json::from_str::<HashMap<String, serde_json::Value>>(text.trim()) {
         return Ok(parsed);
     }
 
-    // Attempt 4: regex-based fallback — try to extract key-value pairs from raw text
     tracing::warn!(
         "JSON parsing failed for AI response; falling back to regex extraction. Raw (first 500 chars): {}",
         &text[..text.len().min(500)]
@@ -269,7 +272,6 @@ fn parse_gemini_response(text_resp: &str) -> Result<String, String> {
 fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
     let mut data = HashMap::new();
 
-    // Match "key": "value" patterns (handles both "key":"value" and "key": "value")
     let re = regex::Regex::new(r#""(\w+)""\s*:\s*"([^"]*)""#).unwrap();
     for caps in re.captures_iter(text) {
         let key = caps[1].to_lowercase();
@@ -277,7 +279,6 @@ fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
         data.insert(key, serde_json::Value::String(val));
     }
 
-    // Match "key": number patterns
     let num_re = regex::Regex::new(r#""(\w+)""\s*:\s*([0-9]+\.?[0-9]*)"#).unwrap();
     for caps in num_re.captures_iter(text) {
         let key = caps[1].to_lowercase();
@@ -286,7 +287,6 @@ fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
         }
     }
 
-    // If we still have nothing, try to extract date-like patterns
     if data.is_empty() {
         let date_re = regex::Regex::new(r"(\d{4})[-/\.](\d{1,2})[-/\.](\d{1,2})").unwrap();
         if let Some(caps) = date_re.captures(text) {
@@ -336,7 +336,7 @@ pub async fn extract_metadata_text(
     let start = Instant::now();
     info!("AI text extraction: provider={}, model={}, language={}", provider, config.model, language);
 
-    let sys_prompt = build_system_prompt(language);
+    let sys_prompt = build_system_prompt(language, &config.system_prompt);
     let result = match provider.as_str() {
         "gemini" => gemini_text_extract(text, config, &sys_prompt).await,
         "openai" => openai_text_extract(text, config, &sys_prompt).await,
@@ -358,13 +358,13 @@ pub async fn extract_metadata_vision(
     let start = Instant::now();
     info!("AI vision extraction: provider={}, files={}, language={}", provider, file_buffers.len(), language);
 
-    let sys_prompt = build_system_prompt(language);
+    let sys_prompt = build_system_prompt(language, &config.system_prompt);
     let user_prompt = build_vision_user_prompt(language);
     let result = match provider.as_str() {
         "gemini" => gemini_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
-        "openai" => openai_vision_extract(file_buffers, config, &sys_prompt).await,
-        "anthropic" => anthropic_vision_extract(file_buffers, config, &sys_prompt).await,
-        "ollama" | "xai" | "custom" => openai_compat_vision_extract(file_buffers, config, &sys_prompt).await,
+        "openai" => openai_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
+        "anthropic" => anthropic_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
+        "ollama" | "xai" | "custom" => openai_compat_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
         other => Err(format!("Unknown provider: {}", other)),
     };
 
@@ -415,19 +415,6 @@ pub fn get_model_name(config: &AiConfig) -> String {
         "ollama" | "xai" | "custom" => config.custom_model.clone(),
         _ => String::new(),
     }
-}
-
-fn resolve_ai_config(config: &AiConfig) -> HashMap<String, String> {
-    let mut cfg = HashMap::new();
-    cfg.insert("provider".to_string(), config.provider.clone());
-    cfg.insert("api_key".to_string(), config.api_key.clone());
-    cfg.insert("model".to_string(), config.model.clone());
-    cfg.insert("gemini_model".to_string(), config.gemini_model.clone());
-    cfg.insert("custom_model".to_string(), config.custom_model.clone());
-    cfg.insert("custom_base_url".to_string(), config.custom_base_url.clone());
-    cfg.insert("temperature".to_string(), config.temperature.to_string());
-    cfg.insert("timeout".to_string(), config.timeout.to_string());
-    cfg
 }
 
 async fn gemini_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) -> Result<DocumentMetadata, String> {
@@ -481,10 +468,7 @@ async fn gemini_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) ->
     let status_code = resp.status();
     let text_resp = resp.text().await.map_err(|e| e.to_string())?;
 
-    println!("RAW GEMINI HTTP STATUS: {}", status_code);
-    println!("RAW GEMINI RESPONSE: {}", &text_resp[..text_resp.len().min(2000)]);
-
-    tracing::info!("Gemini text response (truncated): {}", &text_resp[..text_resp.len().min(500)]);
+    tracing::debug!("Gemini text response (status={}, truncated): {}", status_code, &text_resp[..text_resp.len().min(500)]);
     let result_text = parse_gemini_response(&text_resp)?;
 
     let parsed = parse_json_response(&result_text)?;
@@ -529,13 +513,10 @@ async fn gemini_vision_extract(
         file_buffers.len()
     );
 
-    // Build the multi-modal parts array: system prompt + all files + user prompt
     let mut parts: Vec<serde_json::Value> = Vec::new();
 
-    // 1. System prompt as first text part
     parts.push(serde_json::json!({ "text": sys_prompt }));
 
-    // 2. File data as inline_data parts (Base64 encoded)
     for (path, buffer) in file_buffers {
         if buffer.is_empty() {
             tracing::warn!("Empty file buffer for path: {}", path);
@@ -561,7 +542,6 @@ async fn gemini_vision_extract(
         }));
     }
 
-    // 3. Explicit user instruction as final text part
     parts.push(serde_json::json!({ "text": user_prompt }));
 
     let body = serde_json::json!({
@@ -587,15 +567,11 @@ async fn gemini_vision_extract(
     let status_code = resp.status();
     let text_resp = resp.text().await.map_err(|e| e.to_string())?;
 
-    println!("RAW GEMINI HTTP STATUS: {}", status_code);
-    println!("RAW GEMINI RESPONSE: {}", &text_resp[..text_resp.len().min(2000)]);
-
-    tracing::info!("Gemini vision response (truncated): {}", &text_resp[..text_resp.len().min(500)]);
+    tracing::debug!("Gemini vision response (status={}, truncated): {}", status_code, &text_resp[..text_resp.len().min(500)]);
     let result_text = parse_gemini_response(&text_resp)?;
 
     let parsed = parse_json_response(&result_text)?;
 
-    // Log if subject contains ERROR_CANNOT_SEE_FILE
     if let Some(subject_val) = parsed.get("subject") {
         if let Some(subject_str) = subject_val.as_str() {
             if subject_str.contains("ERROR_CANNOT_SEE_FILE") {
@@ -656,6 +632,7 @@ async fn openai_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
     sys_prompt: &str,
+    user_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
@@ -676,6 +653,7 @@ async fn openai_vision_extract(
 
     let mut content_parts = Vec::new();
     content_parts.push(serde_json::json!({"type": "text", "text": sys_prompt}));
+    content_parts.push(serde_json::json!({"type": "text", "text": user_prompt}));
 
     for (path, buffer) in file_buffers {
         let mime = guess_mime(path);
@@ -756,6 +734,7 @@ async fn anthropic_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
     sys_prompt: &str,
+    user_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
@@ -786,10 +765,12 @@ async fn anthropic_vision_extract(
     }
 
     content_parts.push(serde_json::json!({"type": "text", "text": sys_prompt}));
+    content_parts.push(serde_json::json!({"type": "text", "text": user_prompt}));
 
     let body = serde_json::json!({
         "model": model,
         "max_tokens": 1024,
+        "system": sys_prompt,
         "messages": [{"role": "user", "content": content_parts}]
     });
 
@@ -859,6 +840,7 @@ async fn openai_compat_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
     sys_prompt: &str,
+    user_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let base_url = config.custom_base_url.trim();
     if base_url.is_empty() {
@@ -880,6 +862,7 @@ async fn openai_compat_vision_extract(
 
     let mut content_parts = Vec::new();
     content_parts.push(serde_json::json!({"type": "text", "text": sys_prompt}));
+    content_parts.push(serde_json::json!({"type": "text", "text": user_prompt}));
 
     for (path, buffer) in file_buffers {
         let mime = guess_mime(path);

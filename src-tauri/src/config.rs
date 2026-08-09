@@ -113,10 +113,6 @@ pub fn get_settings_directory(app: &tauri::AppHandle) -> PathBuf {
     crate::portable::settings_dir(app)
 }
 
-pub fn is_portable_app() -> bool {
-    crate::portable::is_portable()
-}
-
 pub fn ensure_settings_directory(app: &tauri::AppHandle) -> Result<(), String> {
     let dir = get_settings_directory(app);
     if !dir.exists() {
@@ -127,7 +123,6 @@ pub fn ensure_settings_directory(app: &tauri::AppHandle) -> Result<(), String> {
 
 fn resolve_env_vars(value: &str) -> String {
     let mut result = value.to_string();
-    // Resolve ${VAR} patterns
     let env_re = regex::Regex::new(r#"\$\{(\w+)\}"#).unwrap();
     let matches: Vec<String> = env_re
         .find_iter(&result)
@@ -139,7 +134,6 @@ fn resolve_env_vars(value: &str) -> String {
             result = result.replace(mat, &val);
         }
     }
-    // Resolve $VAR patterns (word boundary)
     let simple_re = regex::Regex::new(r#"\$(\w+)"#).unwrap();
     let simple_matches: Vec<String> = simple_re
         .find_iter(&result)
@@ -257,9 +251,10 @@ pub fn apply_config_update(
                 "temperature" => {
                     ai.temperature = value.parse::<f64>().unwrap_or(ai.temperature);
                 }
-                "timeout" => {
+                 "timeout" => {
                     ai.timeout = value.parse::<u64>().unwrap_or(ai.timeout);
                 }
+                "system_prompt" => ai.system_prompt = value.to_string(),
                 _ => {
                     return Err(format!("Unknown AI config field: {}", field));
                 }
