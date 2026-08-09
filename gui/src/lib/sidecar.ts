@@ -13,6 +13,8 @@ export interface FileResult {
   doc_type: string | null;
   provider: string | null;
   model: string | null;
+  suggestion_names: string[];
+  suggestion_languages: string[];
 }
 
 export interface BatchResult {

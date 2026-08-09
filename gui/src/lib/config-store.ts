@@ -49,6 +49,8 @@ export interface ConfigData {
     separator: string;
     max_length: number;
     sequence_zerofill: number;
+    primary_language: string;
+    suggestion_languages: string[];
   };
   undo: {
     enabled: boolean;
@@ -84,6 +86,8 @@ const DEFAULT_CONFIG: ConfigData = {
     separator: '_',
     max_length: 128,
     sequence_zerofill: 2,
+    primary_language: 'English',
+    suggestion_languages: [],
   },
   undo: {
     enabled: true,

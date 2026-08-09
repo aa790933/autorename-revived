@@ -130,16 +130,20 @@ async fn test_connection(
 async fn extract_metadata_from_text(
     text: String,
     config: AiConfig,
+    language: Option<String>,
 ) -> Result<DocumentMetadata, String> {
-    ai::extract_metadata_text(&text, &config).await
+    let lang = language.unwrap_or_else(|| "English".to_string());
+    ai::extract_metadata_text(&text, &config, &lang).await
 }
 
 #[tauri::command]
 async fn extract_metadata_from_vision(
     files: Vec<(String, Vec<u8>)>,
     config: AiConfig,
+    language: Option<String>,
 ) -> Result<DocumentMetadata, String> {
-    ai::extract_metadata_vision(&files, &config).await
+    let lang = language.unwrap_or_else(|| "English".to_string());
+    ai::extract_metadata_vision(&files, &config, &lang).await
 }
 
 #[tauri::command]
@@ -317,6 +321,8 @@ async fn rename_pdfs(
                     doc_type: None,
                     provider: None,
                     model: None,
+                    suggestion_names: vec![],
+                    suggestion_languages: vec![],
                 });
                 result.failed += 1;
                 continue;
@@ -331,25 +337,25 @@ async fn rename_pdfs(
 
         let current_model = ai::get_model_name(&ai_config);
 
-        let metadata = if extractors::is_image_extension(path) {
+        // Build the list of languages: primary + suggestions
+        let languages = ai::get_all_languages(
+            &config.naming.primary_language,
+            &config.naming.suggestion_languages,
+        );
+
+        // Extract metadata (once per language)
+        let all_metadata: Vec<ai::DocumentMetadata> = if extractors::is_image_extension(path) {
             // Images always go through vision
-            match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config).await {
-                Ok(m) => Some(m),
-                Err(e) => {
-                    tracing::warn!("AI vision extraction failed for {}: {}", path, e);
-                    None
-                }
-            }
+            ai::extract_metadata_vision_multi(
+                &[(path.clone(), file_bytes.clone())],
+                &ai_config,
+                &languages,
+            )
+            .await
         } else if extractors::is_text_extension(path) {
             // Pure text files: read as text, send to text AI
             let text = String::from_utf8_lossy(&file_bytes).to_string();
-            match ai::extract_metadata_text(&text, &ai_config).await {
-                Ok(m) => Some(m),
-                Err(e) => {
-                    tracing::warn!("AI text extraction failed for {}: {}", e, path);
-                    None
-                }
-            }
+            ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
         } else if extractors::is_office_extension(path) || extractors::is_pdf_extension(path) {
             // DOCX/XLSX/PPTX/PDF: try local extraction first
             match extractors::extract_text_from_file(path) {
@@ -362,84 +368,99 @@ async fn rename_pdfs(
                     );
                     if quality >= config.pdf.text_quality_threshold && !use_vision {
                         // Good quality text, use text AI
-                        match ai::extract_metadata_text(&text, &ai_config).await {
-                            Ok(m) => Some(m),
-                            Err(e) => {
-                                tracing::warn!("AI text extraction failed for {}: {}", path, e);
-                                None
-                            }
-                        }
+                        ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
                     } else {
                         // Poor quality or vision forced, use vision AI
-                        match ai::extract_metadata_vision(
+                        ai::extract_metadata_vision_multi(
                             &[(path.clone(), file_bytes.clone())],
                             &ai_config,
+                            &languages,
                         )
                         .await
-                        {
-                            Ok(m) => Some(m),
-                            Err(e) => {
-                                tracing::warn!("AI vision extraction failed for {}: {}", path, e);
-                                // Fallback: try text extraction with whatever we got
-                                if !text.is_empty() {
-                                    match ai::extract_metadata_text(&text, &ai_config).await {
-                                        Ok(m) => Some(m),
-                                        Err(_) => None,
-                                    }
-                                } else {
-                                    None
-                                }
-                            }
-                        }
                     }
                 }
                 Err(e) => {
                     tracing::warn!("Local extraction failed for {}: {}", path, e);
                     // Fallback: send raw bytes to vision
-                    match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config)
-                        .await
-                    {
-                        Ok(m) => Some(m),
-                        Err(e2) => {
-                            tracing::warn!("Vision fallback also failed for {}: {}", path, e2);
-                            None
-                        }
-                    }
+                    ai::extract_metadata_vision_multi(
+                        &[(path.clone(), file_bytes.clone())],
+                        &ai_config,
+                        &languages,
+                    )
+                    .await
                 }
             }
         } else {
             // Unknown type: try vision
-            match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config).await {
-                Ok(m) => Some(m),
-                Err(e) => {
-                    tracing::warn!("AI vision extraction failed for {}: {}", path, e);
-                    None
-                }
-            }
+            ai::extract_metadata_vision_multi(
+                &[(path.clone(), file_bytes.clone())],
+                &ai_config,
+                &languages,
+            )
+            .await
         };
 
-        let ai_failed = metadata.is_none();
-        let meta = metadata.unwrap_or_default();
+        // The first result is the primary language; the rest are suggestions
+        let primary_meta = all_metadata.first().cloned().unwrap_or_default();
+        let suggestion_metas: Vec<ai::DocumentMetadata> = all_metadata.into_iter().skip(1).collect();
+
+        let ai_failed = primary_meta.company_name.is_empty()
+            && primary_meta.document_type.is_empty()
+            && primary_meta.document_date.is_empty();
         let ai_warning = if ai_failed {
-            Some(format!("AI metadata extraction failed for {} — file named with defaults. Check your API key, model name, and provider settings.", path))
+            Some(format!(
+                "AI metadata extraction failed for {} — file named with defaults. Check your API key, model name, and provider settings.",
+                path
+            ))
         } else {
             None
         };
         let company = document::harmonize_company_name(
-            &meta.company_name,
+            &primary_meta.company_name,
             &config.harmonized_companies,
         );
-        let date = document::parse_document_date(&meta.document_date).unwrap_or_default();
+        let date = document::parse_document_date(&primary_meta.document_date).unwrap_or_default();
 
         let new_name = document::generate_filename(
             &company,
-            &meta.document_type,
+            &primary_meta.document_type,
             &date,
-            &meta.category,
-            &meta.subject,
+            &primary_meta.category,
+            &primary_meta.subject,
             &config.naming,
             path,
         );
+
+        // Generate suggestion names for additional languages
+        let suggestion_names: Vec<String> = suggestion_metas
+            .iter()
+            .filter_map(|sm| {
+                let s_company = document::harmonize_company_name(&sm.company_name, &config.harmonized_companies);
+                let s_date = document::parse_document_date(&sm.document_date).unwrap_or_default();
+                let s_name = document::generate_filename(
+                    &s_company,
+                    &sm.document_type,
+                    &s_date,
+                    &sm.category,
+                    &sm.subject,
+                    &config.naming,
+                    path,
+                );
+                let s_ext = file_utils::get_file_extension(path);
+                let s_final = if !s_ext.is_empty() && !s_name.ends_with(&format!(".{}", s_ext)) {
+                    format!("{}.{}", s_name, s_ext)
+                } else {
+                    s_name.clone()
+                };
+                if s_name == new_name {
+                    None
+                } else {
+                    Some(s_final)
+                }
+            })
+            .collect();
+
+        let suggestion_lang_labels: Vec<String> = config.naming.suggestion_languages.clone();
 
         let ext = file_utils::get_file_extension(path);
         let final_name = if !ext.is_empty() && !new_name.ends_with(&format!(".{}", ext)) {
@@ -466,9 +487,11 @@ async fn rename_pdfs(
                     warnings: ai_warning.iter().cloned().collect(),
                     company: Some(company.clone()),
                     date: Some(date.clone()),
-                    doc_type: Some(meta.document_type.clone()),
+                    doc_type: Some(primary_meta.document_type.clone()),
                     provider: Some(ai_config.provider.clone()),
                     model: Some(current_model.clone()),
+                    suggestion_names: suggestion_names.clone(),
+                    suggestion_languages: suggestion_lang_labels.clone(),
                 });
                 result.failed += 1;
                 continue;
@@ -501,9 +524,11 @@ async fn rename_pdfs(
                 warnings: ai_warning.iter().cloned().chain(std::iter::once("Already matches target name".to_string())).collect(),
                 company: Some(company.clone()),
                 date: Some(date.clone()),
-                doc_type: Some(meta.document_type.clone()),
+                doc_type: Some(primary_meta.document_type.clone()),
                 provider: Some(ai_config.provider.clone()),
                 model: Some(current_model.clone()),
+                suggestion_names: suggestion_names.clone(),
+                suggestion_languages: suggestion_lang_labels.clone(),
             });
             result.skipped += 1;
             continue;
@@ -520,9 +545,11 @@ async fn rename_pdfs(
                     warnings: ai_warning.iter().cloned().collect(),
                     company: Some(company.clone()),
                     date: Some(date.clone()),
-                    doc_type: Some(meta.document_type.clone()),
+                    doc_type: Some(primary_meta.document_type.clone()),
                     provider: Some(ai_config.provider.clone()),
                     model: Some(current_model.clone()),
+                    suggestion_names: suggestion_names.clone(),
+                    suggestion_languages: suggestion_lang_labels.clone(),
                 });
                 result.failed += 1;
                 continue;
@@ -549,9 +576,11 @@ async fn rename_pdfs(
             warnings: ai_warning.iter().cloned().collect(),
             company: Some(company),
             date: Some(date),
-            doc_type: Some(meta.document_type),
+            doc_type: Some(primary_meta.document_type),
             provider: Some(ai_config.provider.clone()),
             model: Some(current_model.clone()),
+            suggestion_names: suggestion_names.clone(),
+            suggestion_languages: suggestion_lang_labels.clone(),
         });
         result.renamed += 1;
     }

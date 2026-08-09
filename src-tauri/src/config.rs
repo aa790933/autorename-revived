@@ -34,6 +34,18 @@ pub struct NamingConfig {
     pub separator: String,
     pub max_length: u32,
     pub sequence_zerofill: u32,
+    #[serde(default = "default_primary_language")]
+    pub primary_language: String,
+    #[serde(default = "default_suggestion_languages")]
+    pub suggestion_languages: Vec<String>,
+}
+
+fn default_primary_language() -> String {
+    "English".to_string()
+}
+
+fn default_suggestion_languages() -> Vec<String> {
+    Vec::new()
 }
 
 impl Default for NamingConfig {
@@ -45,6 +57,8 @@ impl Default for NamingConfig {
             separator: String::from("_"),
             max_length: 128,
             sequence_zerofill: 2,
+            primary_language: default_primary_language(),
+            suggestion_languages: default_suggestion_languages(),
         }
     }
 }
@@ -278,6 +292,14 @@ pub fn apply_config_update(
                 "sequence_zerofill" => {
                     naming.sequence_zerofill =
                         value.parse::<u32>().unwrap_or(naming.sequence_zerofill);
+                }
+                "primary_language" => naming.primary_language = value.to_string(),
+                "suggestion_languages" => {
+                    naming.suggestion_languages = if value.is_empty() {
+                        Vec::new()
+                    } else {
+                        value.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
+                    };
                 }
                 _ => {
                     return Err(format!("Unknown naming config field: {}", field));

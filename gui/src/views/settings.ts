@@ -61,6 +61,13 @@ const NAMING_FIELDS: FieldDef[] = [
   { key: 'sequence_zerofill', label: 'Sequence Zero-Fill', type: 'number', hint: 'Pad sequence numbers to this width', configKey: 'naming' },
 ];
 
+const LANGUAGES = ['English', 'French', 'Arabic'];
+
+const LANGUAGES_FIELDS: FieldDef[] = [
+  { key: 'primary_language', label: 'Primary Language', type: 'string', configKey: 'naming' },
+  { key: 'suggestion_languages', label: 'Suggestion Languages (comma-separated)', type: 'string', hint: 'e.g. French,Arabic — AI will generate extra name suggestions in these languages', configKey: 'naming' },
+];
+
 const UNDO_FIELDS: FieldDef[] = [
   { key: 'enabled', label: 'Enable Undo', type: 'toggle', configKey: 'undo' },
   { key: 'log_path', label: 'Log Path', type: 'string', hint: 'Path to rename history log', configKey: 'undo' },
@@ -275,10 +282,11 @@ function renderContent(config: ConfigData): void {
         <h3>${escapeHtml(PROVIDER_DEFS[provider]?.label || provider)}</h3>
         <div class="card card-bordered">${providerFieldsHtml}</div>
       </div>
-      ${docHtml}
-      ${namingHtml}
-      ${undoHtml}
-      ${generalHtml}
+       ${docHtml}
+       ${namingHtml}
+       ${renderSection('AI Languages', LANGUAGES_FIELDS, config)}
+       ${undoHtml}
+       ${generalHtml}
     </div>
   `;
 }
@@ -306,6 +314,7 @@ async function saveAllSettings(): Promise<void> {
     ...COMMON_AI_FIELDS,
     ...DOCUMENT_FIELDS,
     ...NAMING_FIELDS,
+    ...LANGUAGES_FIELDS,
     ...UNDO_FIELDS,
     ...GENERAL_FIELDS,
   ];

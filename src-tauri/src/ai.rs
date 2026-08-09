@@ -103,6 +103,45 @@ CRITICAL RULES:
 
 const VISION_USER_PROMPT: &str = "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.";
 
+fn build_system_prompt(language: &str) -> String {
+    if language.eq_ignore_ascii_case("English") {
+        return SYSTEM_PROMPT.to_string();
+    }
+
+    format!(
+        "{}: Output all metadata field values in {} language. For doctype, use the {} translation of document type names (e.g., Invoice, Receipt, Contract, etc.). For category, use the {} translation of category names (e.g., Finance, Personal, Work, etc.).",
+        SYSTEM_PROMPT,
+        language,
+        language,
+        language
+    )
+}
+
+fn build_vision_user_prompt(language: &str) -> String {
+    if language.eq_ignore_ascii_case("English") {
+        return VISION_USER_PROMPT.to_string();
+    }
+
+    format!(
+        "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Output all metadata field values in {} language. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.",
+        language
+    )
+}
+
+fn get_all_languages(primary: &str, suggestions: &[String]) -> Vec<String> {
+    let mut langs = vec![primary.to_string()];
+    for s in suggestions {
+        if !langs.iter().any(|l| l.eq_ignore_ascii_case(s)) {
+            langs.push(s.clone());
+        }
+    }
+    langs
+}
+
+fn build_text_prompt(system_prompt: &str, text: &str) -> String {
+    format!("{}\n\nDocument text:\n{}\n\nExtract metadata JSON.", system_prompt, text)
+}
+
 fn gemini_response_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "OBJECT",
@@ -291,16 +330,18 @@ fn file_extension(path: &str) -> String {
 pub async fn extract_metadata_text(
     text: &str,
     config: &AiConfig,
+    language: &str,
 ) -> Result<DocumentMetadata, String> {
     let provider = &config.provider;
     let start = Instant::now();
-    info!("AI text extraction: provider={}, model={}", provider, config.model);
+    info!("AI text extraction: provider={}, model={}, language={}", provider, config.model, language);
 
+    let sys_prompt = build_system_prompt(language);
     let result = match provider.as_str() {
-        "gemini" => gemini_text_extract(text, config).await,
-        "openai" => openai_text_extract(text, config).await,
-        "anthropic" => anthropic_text_extract(text, config).await,
-        "ollama" | "xai" | "custom" => openai_compat_text_extract(text, config).await,
+        "gemini" => gemini_text_extract(text, config, &sys_prompt).await,
+        "openai" => openai_text_extract(text, config, &sys_prompt).await,
+        "anthropic" => anthropic_text_extract(text, config, &sys_prompt).await,
+        "ollama" | "xai" | "custom" => openai_compat_text_extract(text, config, &sys_prompt).await,
         other => Err(format!("Unknown provider: {}", other)),
     };
 
@@ -311,22 +352,60 @@ pub async fn extract_metadata_text(
 pub async fn extract_metadata_vision(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
+    language: &str,
 ) -> Result<DocumentMetadata, String> {
     let provider = &config.provider;
     let start = Instant::now();
-    info!("AI vision extraction: provider={}, files={}", provider, file_buffers.len());
+    info!("AI vision extraction: provider={}, files={}, language={}", provider, file_buffers.len(), language);
 
+    let sys_prompt = build_system_prompt(language);
+    let user_prompt = build_vision_user_prompt(language);
     let result = match provider.as_str() {
-        "gemini" => gemini_vision_extract(file_buffers, config).await,
-        "openai" => openai_vision_extract(file_buffers, config).await,
-        "anthropic" => anthropic_vision_extract(file_buffers, config).await,
-        "ollama" | "xai" | "custom" => openai_compat_vision_extract(file_buffers, config).await,
+        "gemini" => gemini_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
+        "openai" => openai_vision_extract(file_buffers, config, &sys_prompt).await,
+        "anthropic" => anthropic_vision_extract(file_buffers, config, &sys_prompt).await,
+        "ollama" | "xai" | "custom" => openai_compat_vision_extract(file_buffers, config, &sys_prompt).await,
         other => Err(format!("Unknown provider: {}", other)),
     };
 
     info!("AI vision extraction completed in {:?}", start.elapsed());
     result
 }
+
+pub async fn extract_metadata_text_multi(
+    text: &str,
+    config: &AiConfig,
+    languages: &[String],
+) -> Vec<DocumentMetadata> {
+    let mut results = Vec::new();
+    for lang in languages {
+        match extract_metadata_text(text, config, lang).await {
+            Ok(m) => results.push(m),
+            Err(e) => {
+                tracing::warn!("AI text extraction failed for language {}: {}", lang, e);
+            }
+        }
+    }
+    results
+}
+
+pub async fn extract_metadata_vision_multi(
+    file_buffers: &[(String, Vec<u8>)],
+    config: &AiConfig,
+    languages: &[String],
+) -> Vec<DocumentMetadata> {
+    let mut results = Vec::new();
+    for lang in languages {
+        match extract_metadata_vision(file_buffers, config, lang).await {
+            Ok(m) => results.push(m),
+            Err(e) => {
+                tracing::warn!("AI vision extraction failed for language {}: {}", lang, e);
+            }
+        }
+    }
+    results
+}
+
 
 pub fn get_model_name(config: &AiConfig) -> String {
     match config.provider.as_str() {
@@ -351,7 +430,7 @@ fn resolve_ai_config(config: &AiConfig) -> HashMap<String, String> {
     cfg
 }
 
-async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMetadata, String> {
+async fn gemini_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
         return Err("Gemini API key is required".to_string());
@@ -381,7 +460,7 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
     let body = serde_json::json!({
         "contents": [{
             "parts": [{
-                "text": format!("{}\n\nDocument text:\n{}\n\nExtract metadata JSON.", SYSTEM_PROMPT, text)
+                "text": build_text_prompt(sys_prompt, text)
             }]
         }],
         "generationConfig": {
@@ -415,6 +494,8 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
 async fn gemini_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
+    sys_prompt: &str,
+    user_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
@@ -452,7 +533,7 @@ async fn gemini_vision_extract(
     let mut parts: Vec<serde_json::Value> = Vec::new();
 
     // 1. System prompt as first text part
-    parts.push(serde_json::json!({ "text": SYSTEM_PROMPT }));
+    parts.push(serde_json::json!({ "text": sys_prompt }));
 
     // 2. File data as inline_data parts (Base64 encoded)
     for (path, buffer) in file_buffers {
@@ -481,7 +562,7 @@ async fn gemini_vision_extract(
     }
 
     // 3. Explicit user instruction as final text part
-    parts.push(serde_json::json!({ "text": VISION_USER_PROMPT }));
+    parts.push(serde_json::json!({ "text": user_prompt }));
 
     let body = serde_json::json!({
         "contents": [{ "parts": parts }],
@@ -526,7 +607,7 @@ async fn gemini_vision_extract(
     Ok(data_to_metadata(&parsed))
 }
 
-async fn openai_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMetadata, String> {
+async fn openai_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
         return Err("OpenAI API key is required".to_string());
@@ -548,7 +629,7 @@ async fn openai_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
         "model": model,
         "temperature": config.temperature,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": sys_prompt},
             {"role": "user", "content": format!("Document text:\n\n{}\n\nExtract metadata JSON.", text)}
         ],
         "response_format": {"type": "json_object"}
@@ -574,6 +655,7 @@ async fn openai_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
 async fn openai_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
+    sys_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
@@ -593,7 +675,7 @@ async fn openai_vision_extract(
     let url = format!("{}/v1/chat/completions", OPENAI_API_BASE);
 
     let mut content_parts = Vec::new();
-    content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
+    content_parts.push(serde_json::json!({"type": "text", "text": sys_prompt}));
 
     for (path, buffer) in file_buffers {
         let mime = guess_mime(path);
@@ -629,7 +711,7 @@ async fn openai_vision_extract(
     Ok(data_to_metadata(&parsed))
 }
 
-async fn anthropic_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMetadata, String> {
+async fn anthropic_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
         return Err("Anthropic API key is required".to_string());
@@ -650,7 +732,7 @@ async fn anthropic_text_extract(text: &str, config: &AiConfig) -> Result<Documen
     let body = serde_json::json!({
         "model": model,
         "max_tokens": 1024,
-        "system": SYSTEM_PROMPT,
+        "system": sys_prompt,
         "messages": [{"role": "user", "content": format!("Document text:\n\n{}\n\nExtract metadata JSON.", text)}]
     });
 
@@ -673,6 +755,7 @@ async fn anthropic_text_extract(text: &str, config: &AiConfig) -> Result<Documen
 async fn anthropic_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
+    sys_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let api_key = config.api_key.trim();
     if api_key.is_empty() {
@@ -702,7 +785,7 @@ async fn anthropic_vision_extract(
         }));
     }
 
-    content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
+    content_parts.push(serde_json::json!({"type": "text", "text": sys_prompt}));
 
     let body = serde_json::json!({
         "model": model,
@@ -726,7 +809,7 @@ async fn anthropic_vision_extract(
     Ok(data_to_metadata(&parsed))
 }
 
-async fn openai_compat_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMetadata, String> {
+async fn openai_compat_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) -> Result<DocumentMetadata, String> {
     let base_url = config.custom_base_url.trim();
     if base_url.is_empty() {
         return Err("Custom API base URL is required".to_string());
@@ -749,7 +832,7 @@ async fn openai_compat_text_extract(text: &str, config: &AiConfig) -> Result<Doc
         "model": model,
         "temperature": config.temperature,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": sys_prompt},
             {"role": "user", "content": format!("Document text:\n\n{}\n\nExtract metadata JSON.", text)}
         ],
         "response_format": {"type": "json_object"}
@@ -775,6 +858,7 @@ async fn openai_compat_text_extract(text: &str, config: &AiConfig) -> Result<Doc
 async fn openai_compat_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
+    sys_prompt: &str,
 ) -> Result<DocumentMetadata, String> {
     let base_url = config.custom_base_url.trim();
     if base_url.is_empty() {
@@ -795,7 +879,7 @@ async fn openai_compat_vision_extract(
     let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
 
     let mut content_parts = Vec::new();
-    content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
+    content_parts.push(serde_json::json!({"type": "text", "text": sys_prompt}));
 
     for (path, buffer) in file_buffers {
         let mime = guess_mime(path);

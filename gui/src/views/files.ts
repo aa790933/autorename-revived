@@ -119,7 +119,27 @@ function renderFileRow(f: FileEntry): string {
   let detail = '';
   if (newName && (vs === 'preview' || vs === 'renamed')) {
     const nameClass = vs === 'preview' ? 'fq-new-name-preview' : 'fq-new-name-renamed';
-    detail = `<span class="fq-preview"><span class="fq-arrow">\u2192</span><span class="fq-new-name ${nameClass}">${escapeHtml(newName)}</span></span>`;
+    let suggestionsHtml = '';
+    const suggestionNames = f.result?.suggestion_names ?? [];
+    const suggestionLanguages = f.result?.suggestion_languages ?? [];
+    if (suggestionNames.length > 0 && vs === 'preview') {
+      const suggestionItems = suggestionNames.map((s, i) => {
+        const lang = suggestionLanguages[i] || '';
+        const label = lang ? `${lang}` : `Option ${i + 1}`;
+        return `<button type="button" class="fq-suggestion-btn" data-file="${escapeHtml(f.path)}" data-name="${escapeHtml(s)}" title="Use this name">${escapeHtml(s)}</button>`;
+      }).join('');
+      suggestionsHtml = `
+        <div class="fq-suggestions">
+          <span class="fq-suggestion-label">Suggestions:</span>
+          ${suggestionItems}
+        </div>`;
+    }
+    detail = `
+      <span class="fq-preview">
+        <span class="fq-arrow">\u2192</span>
+        <span class="fq-new-name ${nameClass}">${escapeHtml(newName)}</span>
+      </span>
+      ${suggestionsHtml}`;
   }
   if (error && vs === 'failed') {
     detail = `<span class="fq-error">${escapeHtml(error)}</span>`;
@@ -191,10 +211,37 @@ function renderFileList(state: AppState): void {
   document.getElementById('btn-rename')?.addEventListener('click', () => runRename(false));
   document.getElementById('btn-clear')?.addEventListener('click', () => clearFiles());
   document.getElementById('btn-undo')?.addEventListener('click', handleUndo);
-   document.getElementById('btn-add-more')?.addEventListener('click', async () => {
+  document.getElementById('btn-add-more')?.addEventListener('click', async () => {
     const files = await pickFiles();
     if (files.length > 0) addFiles(files);
   });
+
+  // Bind suggestion buttons
+  container.querySelectorAll('.fq-suggestion-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const filePath = (btn as HTMLElement).dataset.file;
+      const newName = (btn as HTMLElement).dataset.name;
+      selectSuggestion(filePath, newName);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion selection
+// ---------------------------------------------------------------------------
+
+function selectSuggestion(filePath: string, newName: string): void {
+  const currentState = getState();
+  const updatedFiles = currentState.files.map((entry) => {
+    if (entry.path !== filePath) return entry;
+    const updatedResult = entry.result
+      ? { ...entry.result, new_name: newName, new_path: null, status: 'preview' as const }
+      : undefined;
+    return { ...entry, result: updatedResult };
+  });
+  setState({ files: updatedFiles });
+  showToast(`Selected name: ${newName}`, 'success');
+  render(getState());
 }
 
 // ---------------------------------------------------------------------------

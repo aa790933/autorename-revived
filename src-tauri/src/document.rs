@@ -19,6 +19,10 @@ pub struct FileResult {
     pub doc_type: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    #[serde(default)]
+    pub suggestion_names: Vec<String>,
+    #[serde(default)]
+    pub suggestion_languages: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

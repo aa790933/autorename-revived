@@ -173,6 +173,48 @@
   line-height: var(--line-height-normal);
 }
 
+.fq-warning {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning, #d97706);
+  line-height: var(--line-height-normal);
+  padding-left: 1.125rem;
+}
+
+.fq-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  padding-left: 1.125rem;
+}
+
+.fq-suggestion-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-medium);
+}
+
+.fq-suggestion-btn {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: 0.1875rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-secondary);
+  background: color-mix(in srgb, var(--color-info, #06b6d4) 8%, transparent);
+  color: var(--color-info, #06b6d4);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.1s, border-color 0.1s;
+}
+
+.fq-suggestion-btn:hover {
+  background: color-mix(in srgb, var(--color-info, #06b6d4) 16%, transparent);
+  border-color: var(--color-info, #06b6d4);
+}
+
 /* Status badge */
 .fq-badge {
   font-size: 0.625rem; /* 10px — smaller than xs for compact badges */
