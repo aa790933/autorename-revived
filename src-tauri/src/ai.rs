@@ -43,13 +43,21 @@ impl Default for AiConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentMetadata {
+    #[serde(default, rename = "company_name", alias = "company")]
     pub company_name: String,
+    #[serde(default, rename = "date", alias = "document_date")]
     pub document_date: String,
+    #[serde(default, rename = "doctype", alias = "document_type")]
     pub document_type: String,
+    #[serde(default)]
     pub category: String,
+    #[serde(default)]
     pub subject: String,
+    #[serde(default)]
     pub confidence: f64,
+    #[serde(default)]
     pub invoice_number: String,
+    #[serde(default)]
     pub total_amount: String,
 }
 
@@ -85,13 +93,15 @@ EXTRACT THESE FIELDS:
 - "company": The company name, sender, brand, or main entity mentioned. If the document is from/to a specific organization, extract it. If none found, summarize the main entity in 1 word.
 - "doctype": One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate. Guess based on visual layout and content patterns.
 - "category": One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax. Choose the most fitting category.
-- "subject": A very brief 2-3 word summary of the document content (e.g., "Server_Hosting", "Q3_Earnings", "Travel_Expense").
+- "subject": A very brief 2-3 word summary of the document content (e.g., "Server_Hosting", "Q3_Earnings", "Travel_Expense"). If you CANNOT read or see the document provided, return "ERROR_CANNOT_SEE_FILE" in the subject field.
 
 CRITICAL RULES:
 1. Output ONLY valid JSON — no markdown fences, no code blocks, just the raw JSON object.
 2. Use underscores '_' instead of spaces in all values.
 3. If a field cannot be determined with high confidence, use "Unknown" as a last resort, NOT null or empty string.
 4. The JSON MUST contain ALL five required fields: date, company, doctype, category, subject."#;
+
+const VISION_USER_PROMPT: &str = "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.";
 
 fn gemini_response_schema() -> serde_json::Value {
     serde_json::json!({
@@ -249,16 +259,25 @@ fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
     data
 }
 
-fn guess_mime(ext: &str) -> &'static str {
-    match ext.to_lowercase().as_str() {
-        ".jpg" | ".jpeg" => "image/jpeg",
-        ".png" => "image/png",
-        ".gif" => "image/gif",
-        ".webp" => "image/webp",
-        ".bmp" => "image/bmp",
-        ".tiff" | ".tif" => "image/tiff",
-        ".pdf" => "application/pdf",
-        _ => "application/octet-stream",
+/// Determines the MIME type from a file path using mime_guess for accuracy.
+/// Falls back to extension-based matching if mime_guess returns nothing.
+fn guess_mime(path: &str) -> String {
+    let mime = mime_guess::from_path(path).first();
+    match mime {
+        Some(m) => m.to_string(),
+        None => {
+            let ext = file_extension(path);
+            match ext.to_lowercase().as_str() {
+                ".jpg" | ".jpeg" => "image/jpeg".to_string(),
+                ".png" => "image/png".to_string(),
+                ".gif" => "image/gif".to_string(),
+                ".webp" => "image/webp".to_string(),
+                ".bmp" => "image/bmp".to_string(),
+                ".tiff" | ".tif" => "image/tiff".to_string(),
+                ".pdf" => "application/pdf".to_string(),
+                _ => "application/octet-stream".to_string(),
+            }
+        }
     }
 }
 
@@ -372,7 +391,12 @@ async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMe
         .await
         .map_err(|e| e.to_string())?;
 
+    let status_code = resp.status();
     let text_resp = resp.text().await.map_err(|e| e.to_string())?;
+
+    println!("RAW GEMINI HTTP STATUS: {}", status_code);
+    println!("RAW GEMINI RESPONSE: {}", &text_resp[..text_resp.len().min(2000)]);
+
     tracing::info!("Gemini text response (truncated): {}", &text_resp[..text_resp.len().min(500)]);
     let result_text = parse_gemini_response(&text_resp)?;
 
@@ -410,14 +434,37 @@ async fn gemini_vision_extract(
         base_url, model, api_key
     );
 
-    let mut contents = Vec::new();
-    contents.push(serde_json::json!({"text": SYSTEM_PROMPT}));
+    tracing::info!(
+        "Gemini vision extract: model={}, files={}",
+        model,
+        file_buffers.len()
+    );
 
+    // Build the multi-modal parts array: system prompt + all files + user prompt
+    let mut parts: Vec<serde_json::Value> = Vec::new();
+
+    // 1. System prompt as first text part
+    parts.push(serde_json::json!({ "text": SYSTEM_PROMPT }));
+
+    // 2. File data as inline_data parts (Base64 encoded)
     for (path, buffer) in file_buffers {
-        let ext = file_extension(path);
-        let mime = guess_mime(&ext);
+        if buffer.is_empty() {
+            tracing::warn!("Empty file buffer for path: {}", path);
+            continue;
+        }
+
+        let mime = guess_mime(path);
         let b64 = general_purpose::STANDARD.encode(buffer);
-        contents.push(serde_json::json!({
+
+        tracing::info!(
+            "Gemini vision: file={}, mime_type={}, buffer_size={}, base64_length={}",
+            path,
+            mime,
+            buffer.len(),
+            b64.len()
+        );
+
+        parts.push(serde_json::json!({
             "inlineData": {
                 "mimeType": mime,
                 "data": b64
@@ -425,13 +472,11 @@ async fn gemini_vision_extract(
         }));
     }
 
-    // Explicitly tell the AI to analyze the provided image/document
-    contents.push(serde_json::json!({
-        "text": "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Do NOT output anything except the JSON object."
-    }));
+    // 3. Explicit user instruction as final text part
+    parts.push(serde_json::json!({ "text": VISION_USER_PROMPT }));
 
     let body = serde_json::json!({
-        "contents": [{"parts": contents}],
+        "contents": [{ "parts": parts }],
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseSchema": gemini_response_schema(),
@@ -440,6 +485,9 @@ async fn gemini_vision_extract(
         }
     });
 
+    let body_str = serde_json::to_string(&body).unwrap_or_default();
+    tracing::debug!("Gemini vision request body (truncated): {}", &body_str[..body_str.len().min(500)]);
+
     let resp = client
         .post(&url)
         .json(&body)
@@ -447,11 +495,26 @@ async fn gemini_vision_extract(
         .await
         .map_err(|e| e.to_string())?;
 
+    let status_code = resp.status();
     let text_resp = resp.text().await.map_err(|e| e.to_string())?;
+
+    println!("RAW GEMINI HTTP STATUS: {}", status_code);
+    println!("RAW GEMINI RESPONSE: {}", &text_resp[..text_resp.len().min(2000)]);
+
     tracing::info!("Gemini vision response (truncated): {}", &text_resp[..text_resp.len().min(500)]);
     let result_text = parse_gemini_response(&text_resp)?;
 
     let parsed = parse_json_response(&result_text)?;
+
+    // Log if subject contains ERROR_CANNOT_SEE_FILE
+    if let Some(subject_val) = parsed.get("subject") {
+        if let Some(subject_str) = subject_val.as_str() {
+            if subject_str.contains("ERROR_CANNOT_SEE_FILE") {
+                tracing::error!("Gemini reported it cannot see the file. Base64 data may be empty or MIME type mismatch.");
+            }
+        }
+    }
+
     Ok(data_to_metadata(&parsed))
 }
 
@@ -525,8 +588,7 @@ async fn openai_vision_extract(
     content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
 
     for (path, buffer) in file_buffers {
-        let ext = file_extension(path);
-        let mime = guess_mime(&ext);
+        let mime = guess_mime(path);
         let b64 = general_purpose::STANDARD.encode(buffer);
         content_parts.push(serde_json::json!({
             "type": "image_url",
@@ -624,8 +686,7 @@ async fn anthropic_vision_extract(
     let mut content_parts = Vec::new();
 
     for (path, buffer) in file_buffers {
-        let ext = file_extension(path);
-        let mime = guess_mime(&ext);
+        let mime = guess_mime(path);
         let b64 = general_purpose::STANDARD.encode(buffer);
         content_parts.push(serde_json::json!({
             "type": "image",
@@ -729,8 +790,7 @@ async fn openai_compat_vision_extract(
     content_parts.push(serde_json::json!({"type": "text", "text": SYSTEM_PROMPT}));
 
     for (path, buffer) in file_buffers {
-        let ext = file_extension(path);
-        let mime = guess_mime(&ext);
+        let mime = guess_mime(path);
         let b64 = general_purpose::STANDARD.encode(buffer);
         content_parts.push(serde_json::json!({
             "type": "image_url",
