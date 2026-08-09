@@ -128,7 +128,7 @@ fn build_vision_user_prompt(language: &str) -> String {
     )
 }
 
-fn get_all_languages(primary: &str, suggestions: &[String]) -> Vec<String> {
+pub fn get_all_languages(primary: &str, suggestions: &[String]) -> Vec<String> {
     let mut langs = vec![primary.to_string()];
     for s in suggestions {
         if !langs.iter().any(|l| l.eq_ignore_ascii_case(s)) {
