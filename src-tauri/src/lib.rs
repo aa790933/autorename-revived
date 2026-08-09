@@ -418,8 +418,9 @@ async fn rename_pdfs(
             }
         };
 
+        let ai_failed = metadata.is_none();
         let meta = metadata.unwrap_or_default();
-        let ai_warning = if metadata.is_none() {
+        let ai_warning = if ai_failed {
             Some(format!("AI metadata extraction failed for {} — file named with defaults. Check your API key, model name, and provider settings.", path))
         } else {
             None
