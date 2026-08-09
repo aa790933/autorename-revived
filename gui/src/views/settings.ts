@@ -61,8 +61,6 @@ const NAMING_FIELDS: FieldDef[] = [
   { key: 'sequence_zerofill', label: 'Sequence Zero-Fill', type: 'number', hint: 'Pad sequence numbers to this width', configKey: 'naming' },
 ];
 
-const LANGUAGES = ['English', 'French', 'Arabic'];
-
 const LANGUAGES_FIELDS: FieldDef[] = [
   { key: 'primary_language', label: 'Primary Language', type: 'string', configKey: 'naming' },
   { key: 'suggestion_languages', label: 'Suggestion Languages (comma-separated)', type: 'string', hint: 'e.g. French,Arabic — AI will generate extra name suggestions in these languages', configKey: 'naming' },
