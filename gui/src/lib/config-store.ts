@@ -65,7 +65,7 @@ const DEFAULT_CONFIG: ConfigData = {
     provider: 'gemini',
     api_key: '',
     model: 'gpt-4o-mini',
-    gemini_model: 'gemini-3.1-flash-lite',
+    gemini_model: 'gemini-3.5-flash-lite',
     gemini_api_key: '',
     gemini_base_url: '',
     custom_model: '',

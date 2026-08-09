@@ -328,14 +328,22 @@ pub async fn extract_metadata_vision(
     result
 }
 
+pub fn get_model_name(config: &AiConfig) -> String {
+    match config.provider.as_str() {
+        "gemini" => config.gemini_model.clone(),
+        "openai" => config.model.clone(),
+        "anthropic" => config.model.clone(),
+        "ollama" | "xai" | "custom" => config.custom_model.clone(),
+        _ => String::new(),
+    }
+}
+
 fn resolve_ai_config(config: &AiConfig) -> HashMap<String, String> {
     let mut cfg = HashMap::new();
     cfg.insert("provider".to_string(), config.provider.clone());
     cfg.insert("api_key".to_string(), config.api_key.clone());
     cfg.insert("model".to_string(), config.model.clone());
     cfg.insert("gemini_model".to_string(), config.gemini_model.clone());
-    cfg.insert("gemini_api_key".to_string(), config.gemini_api_key.clone());
-    cfg.insert("gemini_base_url".to_string(), config.gemini_base_url.clone());
     cfg.insert("custom_model".to_string(), config.custom_model.clone());
     cfg.insert("custom_base_url".to_string(), config.custom_base_url.clone());
     cfg.insert("temperature".to_string(), config.temperature.to_string());
@@ -344,7 +352,7 @@ fn resolve_ai_config(config: &AiConfig) -> HashMap<String, String> {
 }
 
 async fn gemini_text_extract(text: &str, config: &AiConfig) -> Result<DocumentMetadata, String> {
-    let api_key = config.gemini_api_key.trim();
+    let api_key = config.api_key.trim();
     if api_key.is_empty() {
         return Err("Gemini API key is required".to_string());
     }
@@ -408,7 +416,7 @@ async fn gemini_vision_extract(
     file_buffers: &[(String, Vec<u8>)],
     config: &AiConfig,
 ) -> Result<DocumentMetadata, String> {
-    let api_key = config.gemini_api_key.trim();
+    let api_key = config.api_key.trim();
     if api_key.is_empty() {
         return Err("Gemini API key is required for vision extraction".to_string());
     }

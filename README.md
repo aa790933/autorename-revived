@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>AutoRename-Revived v3.0.5</h1>
+  <h1>AutoRename-Revived v3.0.4</h1>
   <p><b>AI-powered batch document renamer — native Rust + Tauri backend with Gemini 3.5 Flash Lite integration.</b></p>
   <p>
     <img src="https://img.shields.io/badge/rust-2021-orange?logo=rust" alt="Rust">
@@ -108,7 +108,7 @@ All fields that cannot be determined are replaced with `"Unknown"` (instead of `
 
 | Provider | Text Model | Vision Model | API Key Field |
 |----------|-----------|-------------|---------------|
-| **Google Gemini** (default) | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | `ai.gemini_api_key` |
+| **Google Gemini** (default) | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | `ai.api_key` |
 | OpenAI | `gpt-4o-mini` | `gpt-4o` | `ai.api_key` |
 | Anthropic | `claude-3-5-haiku-latest` | `claude-sonnet-4-20250514` | `ai.api_key` |
 | Ollama | `llama3.2` | `llama3.2` | None (local) |

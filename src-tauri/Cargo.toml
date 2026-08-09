@@ -1,6 +1,6 @@
 [package]
 name = "autorename-revived-gui"
-version = "3.0.5"
+version = "3.0.4"
 edition = "2021"
 
 [lib]

@@ -329,6 +329,8 @@ async fn rename_pdfs(
             _ => false, // auto: decide based on file type and text quality
         };
 
+        let current_model = ai::get_model_name(&ai_config);
+
         let metadata = if extractors::is_image_extension(path) {
             // Images always go through vision
             match ai::extract_metadata_vision(&[(path.clone(), file_bytes.clone())], &ai_config).await {
@@ -417,6 +419,11 @@ async fn rename_pdfs(
         };
 
         let meta = metadata.unwrap_or_default();
+        let ai_warning = if metadata.is_none() {
+            Some(format!("AI metadata extraction failed for {} — file named with defaults. Check your API key, model name, and provider settings.", path))
+        } else {
+            None
+        };
         let company = document::harmonize_company_name(
             &meta.company_name,
             &config.harmonized_companies,
@@ -448,19 +455,19 @@ async fn rename_pdfs(
 
         let new_path = match resolve_safe_path(&parent_dir, &final_name) {
             Ok(p) => p,
-            Err(e) => {
+             Err(e) => {
                 result.files.push(FileResult {
                     file: path.clone(),
                     status: "failed".to_string(),
                     new_name: Some(final_name),
                     new_path: None,
                     error: Some(e),
-                    warnings: vec![],
+                    warnings: ai_warning.iter().cloned().collect(),
                     company: Some(company.clone()),
                     date: Some(date.clone()),
                     doc_type: Some(meta.document_type.clone()),
                     provider: Some(ai_config.provider.clone()),
-                    model: None,
+                    model: Some(current_model.clone()),
                 });
                 result.failed += 1;
                 continue;
@@ -490,12 +497,12 @@ async fn rename_pdfs(
                 new_name: Some(final_name),
                 new_path: Some(new_path.clone()),
                 error: None,
-                warnings: vec!["Already matches target name".to_string()],
+                warnings: ai_warning.iter().cloned().chain(std::iter::once("Already matches target name".to_string())).collect(),
                 company: Some(company.clone()),
                 date: Some(date.clone()),
                 doc_type: Some(meta.document_type.clone()),
                 provider: Some(ai_config.provider.clone()),
-                model: None,
+                model: Some(current_model.clone()),
             });
             result.skipped += 1;
             continue;
@@ -509,12 +516,12 @@ async fn rename_pdfs(
                     new_name: Some(final_name),
                     new_path: Some(new_path),
                     error: Some(e),
-                    warnings: vec![],
+                    warnings: ai_warning.iter().cloned().collect(),
                     company: Some(company.clone()),
                     date: Some(date.clone()),
                     doc_type: Some(meta.document_type.clone()),
                     provider: Some(ai_config.provider.clone()),
-                    model: None,
+                    model: Some(current_model.clone()),
                 });
                 result.failed += 1;
                 continue;
@@ -538,12 +545,12 @@ async fn rename_pdfs(
             new_name: Some(final_name),
             new_path: Some(new_path),
             error: None,
-            warnings: vec![],
+            warnings: ai_warning.iter().cloned().collect(),
             company: Some(company),
             date: Some(date),
             doc_type: Some(meta.document_type),
             provider: Some(ai_config.provider.clone()),
-            model: None,
+            model: Some(current_model.clone()),
         });
         result.renamed += 1;
     }
@@ -591,7 +598,7 @@ async fn validate_config(app: tauri::AppHandle) -> Result<serde_json::Value, Str
     }
 
     let has_key = match config.ai.provider.as_str() {
-        "gemini" => !config.ai.gemini_api_key.is_empty(),
+        "gemini" => !config.ai.api_key.is_empty(),
         "openai" => !config.ai.api_key.is_empty(),
         "anthropic" => !config.ai.api_key.is_empty(),
         "ollama" => true,

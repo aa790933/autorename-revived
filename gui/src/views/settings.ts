@@ -192,12 +192,22 @@ export async function renderSettingsView(root: HTMLElement): Promise<void> {
     const btn = document.getElementById('btn-test-connection') as HTMLButtonElement | null;
     if (btn) { btn.disabled = true; btn.textContent = 'Testing...'; }
     try {
-      const providerEl = document.getElementById('field-ai-provider') as HTMLSelectElement | null;
-      const apiKeyEl = document.getElementById('field-ai-api_key') as HTMLInputElement | null;
-      const modelEl = document.getElementById('field-ai-model') as HTMLInputElement | null;
-      const provider = providerEl?.value || currentConfig?.ai.provider || 'gemini';
-      const apiKey = apiKeyEl?.value || '';
-      const model = modelEl?.value || '';
+      const provider = currentConfig?.ai.provider || 'gemini';
+      const apiKeyEl = document.getElementById(`field-ai-api_key`) as HTMLInputElement | null;
+      const apiKey = apiKeyEl?.value || currentConfig?.ai.api_key || '';
+
+      let model = '';
+      if (provider === 'gemini') {
+        const modelEl = document.getElementById('field-ai-gemini_model') as HTMLInputElement | null;
+        model = modelEl?.value || currentConfig?.ai.gemini_model || '';
+      } else if (provider === 'custom' || provider === 'ollama' || provider === 'xai') {
+        const modelEl = document.getElementById('field-ai-custom_model') as HTMLInputElement | null;
+        model = modelEl?.value || currentConfig?.ai.custom_model || '';
+      } else {
+        const modelEl = document.getElementById('field-ai-model') as HTMLInputElement | null;
+        model = modelEl?.value || currentConfig?.ai.model || '';
+      }
+
       const result = await invoke<{ success: boolean; message: string; latency_ms: number; provider: string }>('test_connection', { provider, apiKey, model });
       showToast(`${result.provider}: ${result.message}`, result.success ? 'success' : 'danger');
     } catch (err) {
