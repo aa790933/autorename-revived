@@ -13,6 +13,11 @@ let container: HTMLElement;
 let cleanupDnd: (() => void) | undefined;
 let unsubscribe: (() => void) | undefined;
 
+// Module-level flag: tracks whether the current rename operation has been
+// cancelled by the user.  This prevents a stale `renameFiles` promise from
+// overwriting the cancelled state set in `handleCancel`.
+let cancelRequested = false;
+
 export function renderFilesView(root: HTMLElement): void {
   container = root;
 
@@ -258,7 +263,15 @@ function selectSuggestion(filePath: string, newName: string): void {
 // ---------------------------------------------------------------------------
 
 async function runRename(dryRun: boolean): Promise<void> {
+  // Reset cancellation flag at the start of every new operation
+  cancelRequested = false;
+
+  // Fresh read — do NOT rely on a stale closure-captured `state`
   const state = getState();
+
+  // Clear any stale statusError so Dry Run / Rename buttons are re-enabled
+  // after a previous transient error.
+  setState({ statusError: '' });
 
   // Cache path: apply dry-run results directly without re-processing
   if (!dryRun && state.dryRunResult) {
@@ -296,8 +309,16 @@ async function runRename(dryRun: boolean): Promise<void> {
 
   setState({ processing: true, progress: 'Starting...' });
 
-  const pendingFiles = state.files.filter((f) => f.status === 'pending' || f.status === 'skipped');
-  setState({ files: pendingFiles.map((f) => ({ ...f, status: 'processing' as const })) });
+  // Mark only the pending/skipped files as 'processing', preserving
+  // already-completed or failed entries instead of dropping them.
+  const current = getState();
+  setState({
+    files: current.files.map((f) =>
+      f.status === 'pending' || f.status === 'skipped'
+        ? { ...f, status: 'processing' as const }
+        : f,
+    ),
+  });
 
   let result: SidecarResult;
   try {
@@ -306,6 +327,10 @@ async function runRename(dryRun: boolean): Promise<void> {
       { dryRun, provider: getConfigSync().ai.provider },
     );
   } catch (err) {
+    // If the user cancelled, swallow the error — state was already reset
+    if (cancelRequested) {
+      return;
+    }
     const errStr = String(err);
     const lowerErr = errStr.toLowerCase();
     if (lowerErr.includes('sidecar') || lowerErr.includes('not found') || lowerErr.includes('binaries')
@@ -317,11 +342,18 @@ async function runRename(dryRun: boolean): Promise<void> {
       setState({ processing: false, progress: '' });
       showToast(`Error: ${errStr}`, 'danger');
     }
-    // Mark all pending files as failed so they don't stay stuck
-    const updated = state.files.map((f) => (f.status === 'pending' || f.status === 'skipped' || f.status === 'processing')
+    // Mark all pending/processing files as failed so they don't stay stuck
+    const currentAfter = getState();
+    const updated = currentAfter.files.map((f) => (f.status === 'pending' || f.status === 'skipped' || f.status === 'processing')
       ? { ...f, status: 'failed' as const }
       : f);
     setState({ files: updated });
+    return;
+  }
+
+  // If the user cancelled while the async operation was in-flight,
+  // discard the result — the UI state was already updated by handleCancel.
+  if (cancelRequested) {
     return;
   }
 
@@ -379,10 +411,19 @@ async function runRename(dryRun: boolean): Promise<void> {
   }
 }
 
-function handleCancel(): void {
-  cancelRename();
-  setState({ processing: true, progress: 'Cancelling...' });
-  showToast('Cancelling rename operation...', 'info');
+async function handleCancel(): Promise<void> {
+  cancelRequested = true;
+  await cancelRename();
+  setState({ processing: false, progress: '', statusError: '' });
+  const currentState = getState();
+  setState({
+    files: currentState.files.map((f) =>
+      f.status === 'processing'
+        ? { ...f, status: 'failed' as const }
+        : f,
+    ),
+  });
+  showToast('Rename operation cancelled', 'info');
 }
 
 async function handleUndo(): Promise<void> {

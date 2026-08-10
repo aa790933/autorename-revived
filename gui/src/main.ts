@@ -1,9 +1,9 @@
 import { initTitlebar } from './lib/titlebar';
 import { initTheme } from './lib/theme';
 import { initRenderer, createStatusBar } from './renderer';
-import { setState } from './lib/state';
 import { loadConfig } from './lib/config-store';
 import { validateConfig } from './lib/sidecar';
+import { showToast } from './lib/toast';
 
 document.addEventListener('DOMContentLoaded', () => {
   initTitlebar();
@@ -24,9 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
   validateConfig().then((validation) => {
     if (!validation.valid) {
       const errors = validation.issues.filter((i) => i.level === 'error');
-      if (errors.length > 0) setState({ statusError: 'Config error' });
+      if (errors.length > 0) {
+        showToast('Config: ' + errors.map((e) => e.message).join(', '), 'warning');
+      }
     }
   }).catch(() => {
-    setState({ statusError: 'Config error' });
+    showToast('Could not validate config on startup', 'warning');
   });
 });

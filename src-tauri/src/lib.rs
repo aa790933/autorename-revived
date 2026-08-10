@@ -411,6 +411,25 @@ async fn rename_files(
         );
 
         let all_metadata: Vec<ai::DocumentMetadata> = if extractors::is_image_extension(path) {
+            if is_cancelled() {
+                result.files.push(FileResult {
+                    file: path.clone(),
+                    status: "failed".to_string(),
+                    new_name: None,
+                    new_path: None,
+                    error: Some("Rename cancelled by user".to_string()),
+                    warnings: vec![],
+                    company: None,
+                    date: None,
+                    doc_type: None,
+                    provider: None,
+                    model: None,
+                    suggestion_names: vec![],
+                    suggestion_languages: vec![],
+                });
+                result.failed += 1;
+                continue;
+            }
             ai::extract_metadata_vision_multi(
                 &[(path.clone(), file_bytes.clone())],
                 &vision_ai_config,
@@ -418,6 +437,25 @@ async fn rename_files(
             )
             .await
         } else if extractors::is_text_extension(path) {
+            if is_cancelled() {
+                result.files.push(FileResult {
+                    file: path.clone(),
+                    status: "failed".to_string(),
+                    new_name: None,
+                    new_path: None,
+                    error: Some("Rename cancelled by user".to_string()),
+                    warnings: vec![],
+                    company: None,
+                    date: None,
+                    doc_type: None,
+                    provider: None,
+                    model: None,
+                    suggestion_names: vec![],
+                    suggestion_languages: vec![],
+                });
+                result.failed += 1;
+                continue;
+            }
             let text = String::from_utf8_lossy(&file_bytes).to_string();
             ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
         } else if extractors::is_office_extension(path) || extractors::is_pdf_extension(path) {
@@ -474,6 +512,28 @@ async fn rename_files(
             )
             .await
         };
+
+        // Early-exit check: if cancel was requested during AI extraction,
+        // skip metadata processing and mark the file as cancelled.
+        if is_cancelled() {
+            result.files.push(FileResult {
+                file: path.clone(),
+                status: "failed".to_string(),
+                new_name: None,
+                new_path: None,
+                error: Some("Rename cancelled by user".to_string()),
+                warnings: vec![],
+                company: None,
+                date: None,
+                doc_type: None,
+                provider: None,
+                model: None,
+                suggestion_names: vec![],
+                suggestion_languages: vec![],
+            });
+            result.failed += 1;
+            continue;
+        }
 
         let primary_meta = if all_metadata.is_empty() {
             tracing::warn!("All AI metadata extractions returned empty for {}", path);
@@ -608,6 +668,26 @@ async fn rename_files(
                 suggestion_languages: suggestion_lang_labels.clone(),
             });
             result.skipped += 1;
+            continue;
+        }
+
+        if !dry_run && is_cancelled() {
+            result.files.push(FileResult {
+                file: path.clone(),
+                status: "failed".to_string(),
+                new_name: Some(final_name),
+                new_path: None,
+                error: Some("Rename cancelled by user".to_string()),
+                warnings: ai_warning.iter().cloned().collect(),
+                company: Some(company.clone()),
+                date: Some(date.clone()),
+                doc_type: Some(primary_meta.document_type.clone()),
+                provider: Some(ai_config.provider.clone()),
+                model: Some(current_model.clone()),
+                suggestion_names: suggestion_names.clone(),
+                suggestion_languages: suggestion_lang_labels.clone(),
+            });
+            result.failed += 1;
             continue;
         }
 

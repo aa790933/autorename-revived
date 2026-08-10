@@ -58,7 +58,9 @@ export function addFiles(paths: string[]): void {
       name: p.split(/[\\/]/).pop() || p,
       status: 'pending' as const,
     }));
-  setState({ files: [...state.files, ...newEntries], dryRunResult: null, lastResult: null });
+  // Clear stale statusError and dryRunResult so the user can retry after
+  // adding new files following a previous transient error.
+  setState({ files: [...state.files, ...newEntries], dryRunResult: null, lastResult: null, statusError: '', progress: '' });
 }
 
 export function clearFiles(): void {
@@ -77,10 +79,15 @@ export function updateFileStatuses(result: BatchResult, isDryRun = false): void 
       return {
         ...entry,
         status: isDryRun && fileResult.status === 'completed'
-          ? entry.status
+          ? 'pending'
           : (fileResult.status as FileEntry['status']),
         result: fileResult,
       };
+    }
+    // Files in processing that did not receive a result are marked as failed
+    // to prevent them from being stuck indefinitely
+    if (entry.status === 'processing') {
+      return { ...entry, status: 'failed' as const };
     }
     return entry;
   });

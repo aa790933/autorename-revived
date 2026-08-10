@@ -93,26 +93,59 @@ pub struct TestConnectionResult {
 
 const SYSTEM_PROMPT: &str = r#"You are an advanced AI document analyzer specialized in extracting precise metadata for automated file renaming.
 
-Your PRIMARY directive: Read and analyze the ENTIRE document/image thoroughly before extracting fields. Scan all pages and regions — header, body, footer, stamps, watermarks, signatures, tables, and fine print. Do not miss or skip any content. NEVER return null, empty strings, or "Unknown" for fields you can reasonably infer.
+You operate in TWO CLEAR STEPS. Complete Step 1 entirely before beginning Step 2. This ensures you never extract dates or text blindly.
 
-EXTRACT THESE FIELDS:
-- "date": Document date in YYYYMMDD format. Find the date the document was OFFICIALLY ISSUED, SIGNED, or PUBLISHED. This is typically found in the document footer, signature block, or official header at the top of the first page. Look for patterns like "Date:", "Published on:", "Signed on:", "Issue date:", "Date of issue:". If the document has multiple dates, choose the one that represents the document's own issuance/publication — NOT dates referenced in the body text about background laws, decree references, or historical events. For example, if the body mentions "Law 23-05 of 2023" but the footer says "Published: 15 August 2026", use 20260815. NEVER leave empty.
+===== STEP 1: FULL DOCUMENT COMPREHENSION (INTERNAL REASONING) =====
+Before extracting any field, you MUST fully analyze and understand the entire document:
 
-- "company": The FULL legal name of the issuing/sending organization, sender, or main entity. Look for company letterheads, sender blocks, "Issued by:", "From:", authority names, ministry/department names. Extract the complete entity name (e.g., "Ministry_of_Finance", "Algeria_Public_Works_Director"). If none found, summarize in 1 word.
+A. WHAT IS THIS DOCUMENT ACTUALLY ABOUT?
+   Identify the specific core subject or project. This is NOT the document type (e.g., not "Tender" or "Report").
+   It is the WHATS and WHOM that the document concerns. Look for:
+   - Contract or project titles, work descriptions, specific subject lines.
+   - Referenced project names, contract numbers, or filing numbers.
+   - The actual topic the document discusses or decides upon.
+   Examples of good subjects: "Highway_Road_Renovation_Phase_2", "Q3_VAT_Tax_Return", "IT_Server_Procurement".
+   NEVER use generic words like "Tender", "Notice", "Work", "Report", "Document", "Contract", "Agreement" as standalone subjects.
 
-- "doctype": One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Tender, Bid, Agreement, Permit, License, Order, Statement. Guess based on document layout and content patterns. Look for document titles like "CONTRACT", "TENDER", "AGREEMENT" at the top.
+B. WHO ISSUED OR SIGNED THIS DOCUMENT?
+   Find the issuing organization, sender, or signing authority. This is typically in:
+   - The letterhead, header, or sender block at the top.
+   - The signature block, "Issued by:", "From:", or authority name.
+   - Footer or imprint area.
+   Extract the FULL legal name. If a ministry, include the ministry name (e.g., "Ministry_of_Finance").
 
-- "category": One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government. Choose the most fitting.
+C. WHEN WAS THIS DOCUMENT OFFICIALLY ISSUED, SIGNED, OR PUBLISHED?
+   You must distinguish the document's OWN issuance date from background reference dates:
+   - The issuance date is typically in the footer, signature block, or official header.
+   - If the document mentions "Law 23-05 of 2023" in the body but the footer says "Published: 15 August 2026", use 20260815.
+   - If the document references "Decree No. 12/2024" but itself was signed on "3 March 2025", use 20250303.
+   - NEVER pick up background dates, law enactment dates, contract reference periods, or historical event dates.
 
-- "subject": The SPECIFIC topic or project name of this document — NOT a generic document category or repeated doctype label. Extract the actual project name, contract title, work description, or unique subject matter (e.g., "50_Housing_Units_Construction", "IT_Server_Procurement_Project", "Q3_VAT_Tax_Return", "Highway_Road_Renovation_Phase_2"). Look for contract numbers, project names, work descriptions, or specific subject lines. NEVER include generic words like "Tender", "Notice", "Work", "Report", "Document", "Contract", "Agreement" as standalone subjects. The subject should describe WHAT this specific document is about, not what TYPE of document it is. If no specific project can be identified, use "Unknown".
+D. WHAT IS ITS ADMINISTRATIVE TYPE AND DOMAIN CATEGORY?
+   Determine the document type (Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Tender, Bid, Agreement, Permit, License, Order, Statement) and category (Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government).
+
+===== STEP 2: ACCURATE TEMPLATE POPULATION =====
+Only after completing your full comprehension above, output EXACTLY the following JSON object with your extracted values:
+
+{
+  "date": "<YYYYMMDD>",
+  "company": "<full issuer name with underscores>",
+  "doctype": "<one of the allowed types>",
+  "category": "<one of the allowed categories>",
+  "subject": "<specific subject, NOT generic words like Tender/Notice/Work/Report/Document/Contract/Agreement>"
+}
 
 CRITICAL RULES:
-1. Output ONLY valid JSON — no markdown fences, no code blocks, just the raw JSON object.
+1. Output ONLY valid JSON — no markdown fences, no code blocks, no extra text, just the raw JSON object.
 2. Use underscores '_' instead of spaces in all values.
-3. If a field cannot be determined with high confidence, use "Unknown" as a last resort, NOT null or empty string.
+3. If a field truly cannot be determined, use "Unknown" as a last resort, NOT null or empty string.
 4. The JSON MUST contain ALL five required fields: date, company, doctype, category, subject."#;
 
-const VISION_USER_PROMPT: &str = "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Focus on the document's own issuance/publication date (typically in footer, signature block, or official header — NOT reference dates to background laws). The subject field should capture the specific project or topic name, NEVER generic words like 'Tender', 'Notice', 'Work', or 'Report'. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.";
+const VISION_USER_PROMPT: &str = r#"STEP 1 — FULL DOCUMENT COMPREHENSION: Study the entire document/image thoroughly. Identify what this specific document is about (the actual subject/topic, not just the type), who issued/signed it, when it was officially issued/signed/published (distinguishing from background reference dates like laws or decrees mentioned in the body), and its administrative type and domain category.
+
+STEP 2 — ACCURATE TEMPLATE POPULATION: Only after achieving full comprehension, extract the metadata fields in JSON format. Focus on the document's OWN issuance/publication date (typically in footer, signature block, or official header — NOT reference dates to background laws). The subject field should capture the specific project or topic name, NEVER generic words like 'Tender', 'Notice', 'Work', or 'Report'.
+
+Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field."#;
 
 fn build_system_prompt(language: &str, prompt_template: &str) -> String {
     if language.eq_ignore_ascii_case("English") {
@@ -134,7 +167,7 @@ fn build_vision_user_prompt(language: &str) -> String {
     }
 
     format!(
-        "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Output all metadata field values in {} language. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.",
+        "STEP 1 — FULL DOCUMENT COMPREHENSION: Study the entire document/image thoroughly. Identify what this specific document is about (the actual subject/topic, not just the type), who issued/signed it, when it was officially issued/signed/published (distinguishing from background reference dates like laws or decrees mentioned in the body), and its administrative type and domain category.\n\nSTEP 2 — ACCURATE TEMPLATE POPULATION: Only after achieving full comprehension, extract the metadata fields in JSON format. Output all metadata field values in {} language. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.",
         language
     )
 }
@@ -150,7 +183,7 @@ pub fn get_all_languages(primary: &str, suggestions: &[String]) -> Vec<String> {
 }
 
 fn build_text_prompt(system_prompt: &str, text: &str) -> String {
-    format!("{}\n\nDocument text:\n{}\n\nExtract metadata JSON.", system_prompt, text)
+    format!("{}\n\nDocument text:\n{}\n\nAfter completing full document comprehension (Step 1), output the metadata JSON (Step 2).", system_prompt, text)
 }
 
 fn gemini_response_schema() -> serde_json::Value {
