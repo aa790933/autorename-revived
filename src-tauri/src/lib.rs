@@ -16,7 +16,6 @@ use file_utils::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Manager;
 
 static CANCEL_RENAME: AtomicBool = AtomicBool::new(false);
 
