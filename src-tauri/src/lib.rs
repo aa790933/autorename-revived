@@ -571,7 +571,7 @@ async fn rename_pdfs(
                     file: path.clone(),
                     status: "failed".to_string(),
                     new_name: Some(final_name),
-                    new_path: Some(new_path_clone.clone()),
+                    new_path: Some(new_path.clone()),
                     error: Some(e),
                     warnings: ai_warning.iter().cloned().collect(),
                     company: Some(company.clone()),
