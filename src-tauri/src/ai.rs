@@ -22,12 +22,8 @@ pub struct AiConfig {
     pub custom_base_url: String,
     pub temperature: f64,
     pub timeout: u64,
-    #[serde(default = "default_system_prompt")]
+    #[serde(default)]
     pub system_prompt: String,
-}
-
-fn default_system_prompt() -> String {
-    SYSTEM_PROMPT.to_string()
 }
 
 impl Default for AiConfig {
@@ -43,7 +39,7 @@ impl Default for AiConfig {
             custom_base_url: String::new(),
             temperature: 0.0,
             timeout: 30,
-            system_prompt: default_system_prompt(),
+            system_prompt: String::new(),
         }
     }
 }
@@ -90,56 +86,6 @@ pub struct TestConnectionResult {
     pub latency_ms: u128,
     pub provider: String,
 }
-
-const SYSTEM_PROMPT: &str = r#"You are an advanced AI document analyzer specialized in extracting precise metadata for automated file renaming.
-
-You operate in TWO CLEAR STEPS. Complete Step 1 entirely before beginning Step 2. This ensures you never extract dates or text blindly.
-
-===== STEP 1: FULL DOCUMENT COMPREHENSION (INTERNAL REASONING) =====
-Before extracting any field, you MUST fully analyze and understand the entire document:
-
-A. WHAT IS THIS DOCUMENT ACTUALLY ABOUT?
-   Identify the specific core subject or project. This is NOT the document type (e.g., not "Tender" or "Report").
-   It is the WHATS and WHOM that the document concerns. Look for:
-   - Contract or project titles, work descriptions, specific subject lines.
-   - Referenced project names, contract numbers, or filing numbers.
-   - The actual topic the document discusses or decides upon.
-   Examples of good subjects: "Highway_Road_Renovation_Phase_2", "Q3_VAT_Tax_Return", "IT_Server_Procurement".
-   NEVER use generic words like "Tender", "Notice", "Work", "Report", "Document", "Contract", "Agreement" as standalone subjects.
-
-B. WHO ISSUED OR SIGNED THIS DOCUMENT?
-   Find the issuing organization, sender, or signing authority. This is typically in:
-   - The letterhead, header, or sender block at the top.
-   - The signature block, "Issued by:", "From:", or authority name.
-   - Footer or imprint area.
-   Extract the FULL legal name. If a ministry, include the ministry name (e.g., "Ministry_of_Finance").
-
-C. WHEN WAS THIS DOCUMENT OFFICIALLY ISSUED, SIGNED, OR PUBLISHED?
-   You must distinguish the document's OWN issuance date from background reference dates:
-   - The issuance date is typically in the footer, signature block, or official header.
-   - If the document mentions "Law 23-05 of 2023" in the body but the footer says "Published: 15 August 2026", use 20260815.
-   - If the document references "Decree No. 12/2024" but itself was signed on "3 March 2025", use 20250303.
-   - NEVER pick up background dates, law enactment dates, contract reference periods, or historical event dates.
-
-D. WHAT IS ITS ADMINISTRATIVE TYPE AND DOMAIN CATEGORY?
-   Determine the document type (Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Tender, Bid, Agreement, Permit, License, Order, Statement) and category (Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government).
-
-===== STEP 2: ACCURATE TEMPLATE POPULATION =====
-Only after completing your full comprehension above, output EXACTLY the following JSON object with your extracted values:
-
-{
-  "date": "<YYYYMMDD>",
-  "company": "<full issuer name with underscores>",
-  "doctype": "<one of the allowed types>",
-  "category": "<one of the allowed categories>",
-  "subject": "<specific subject, NOT generic words like Tender/Notice/Work/Report/Document/Contract/Agreement>"
-}
-
-CRITICAL RULES:
-1. Output ONLY valid JSON — no markdown fences, no code blocks, no extra text, just the raw JSON object.
-2. Use underscores '_' instead of spaces in all values.
-3. If a field truly cannot be determined, use "Unknown" as a last resort, NOT null or empty string.
-4. The JSON MUST contain ALL five required fields: date, company, doctype, category, subject."#;
 
 const VISION_USER_PROMPT: &str = r#"STEP 1 — FULL DOCUMENT COMPREHENSION: Study the entire document/image thoroughly. Identify what this specific document is about (the actual subject/topic, not just the type), who issued/signed it, when it was officially issued/signed/published (distinguishing from background reference dates like laws or decrees mentioned in the body), and its administrative type and domain category.
 

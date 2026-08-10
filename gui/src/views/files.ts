@@ -375,6 +375,18 @@ async function runRename(dryRun: boolean): Promise<void> {
     if (result.suggestion) msg += `. ${result.suggestion}`;
     if (statusMsg) setState({ statusError: statusMsg });
     showToast(msg, 'danger');
+    // CRITICAL: Mark all stuck 'processing' files as 'failed' so they
+    // don't remain permanently in the processing state.  This happens
+    // when the backend returns an ErrorResult (e.g. a panic during
+    // AI extraction for non-PDF files) instead of a BatchResult.
+    const currentError = getState();
+    setState({
+      files: currentError.files.map((f) =>
+        f.status === 'processing'
+          ? { ...f, status: 'failed' as const, result: undefined }
+          : f,
+      ),
+    });
     return;
   }
 
@@ -413,7 +425,11 @@ async function runRename(dryRun: boolean): Promise<void> {
 
 async function handleCancel(): Promise<void> {
   cancelRequested = true;
-  await cancelRename();
+  try {
+    await cancelRename();
+  } catch {
+    // Ignore backend call failure — the flag is set locally
+  }
   setState({ processing: false, progress: '', statusError: '' });
   const currentState = getState();
   setState({

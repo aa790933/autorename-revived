@@ -46,7 +46,7 @@ const PROVIDER_DEFS: Record<string, { label: string; icon: string; fields: Field
 const COMMON_AI_FIELDS: FieldDef[] = [
   { key: 'temperature', label: 'Temperature', type: 'number', hint: '0.0 = deterministic, 1.0 = creative', configKey: 'ai' },
   { key: 'timeout', label: 'Timeout (seconds)', type: 'number', configKey: 'ai' },
-  { key: 'system_prompt', label: 'AI System Prompt', type: 'textarea', hint: 'Customize instructions given to the AI for metadata extraction. Leave empty to use the default prompt.', configKey: 'ai' },
+  { key: 'system_prompt', label: 'AI System Prompt', type: 'textarea', hint: 'Custom instructions given to the AI model for metadata extraction. Configure per the model provider documentation.', configKey: 'ai' },
 ];
 
 const DOCUMENT_FIELDS: FieldDef[] = [
