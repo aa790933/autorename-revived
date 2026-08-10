@@ -524,10 +524,6 @@ async fn rename_pdfs(
             }
         };
 
-        if src_normalized == dst_normalized
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
         let src_normalized = std::path::Path::new(path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
