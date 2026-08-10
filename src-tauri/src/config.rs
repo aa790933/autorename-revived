@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use tauri_plugin_store::StoreBuilder;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PdfConfig {
+pub struct DocumentConfig {
     pub vision: String,
     pub vision_provider: String,
     #[serde(default = "default_text_quality_threshold")]
@@ -16,7 +16,7 @@ fn default_text_quality_threshold() -> f64 {
     0.2
 }
 
-impl Default for PdfConfig {
+impl Default for DocumentConfig {
     fn default() -> Self {
         Self {
             vision: "auto".to_string(),
@@ -83,7 +83,7 @@ impl Default for UndoConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub ai: AiConfig,
-    pub pdf: PdfConfig,
+    pub document: DocumentConfig,
     pub naming: NamingConfig,
     pub undo: UndoConfig,
     pub harmonized_companies: Vec<HashMap<String, serde_json::Value>>,
@@ -95,7 +95,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             ai: AiConfig::default(),
-            pdf: PdfConfig::default(),
+            document: DocumentConfig::default(),
             naming: NamingConfig::default(),
             undo: UndoConfig::default(),
             harmonized_companies: Vec::new(),
@@ -260,17 +260,17 @@ pub fn apply_config_update(
                 }
             }
         }
-        "pdf" => {
-            let pdf = &mut config.pdf;
+        "document" => {
+            let document = &mut config.document;
             match field {
-                "vision" => pdf.vision = value.to_string(),
-                "vision_provider" => pdf.vision_provider = value.to_string(),
+                "vision" => document.vision = value.to_string(),
+                "vision_provider" => document.vision_provider = value.to_string(),
                 "text_quality_threshold" => {
-                    pdf.text_quality_threshold =
-                        value.parse::<f64>().unwrap_or(pdf.text_quality_threshold);
+                    document.text_quality_threshold =
+                        value.parse::<f64>().unwrap_or(document.text_quality_threshold);
                 }
                 _ => {
-                    return Err(format!("Unknown PDF config field: {}", field));
+                    return Err(format!("Unknown document config field: {}", field));
                 }
             }
         }

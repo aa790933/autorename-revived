@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export interface FileResult {
   file: string;
-  status: 'renamed' | 'skipped' | 'failed';
+  status: 'completed' | 'skipped' | 'failed';
   new_name: string | null;
   new_path: string | null;
   error: string | null;
@@ -19,7 +19,7 @@ export interface FileResult {
 export interface BatchResult {
   success: boolean;
   total: number;
-  renamed: number;
+  completed: number;
   skipped: number;
   failed: number;
   files: FileResult[];
@@ -41,9 +41,10 @@ export interface ConfigData {
     timeout: number;
     system_prompt: string;
   };
-  pdf: {
+  document: {
     vision: string;
     vision_provider: string;
+    text_quality_threshold: number;
   };
   naming: {
     template: string;
@@ -79,9 +80,10 @@ const DEFAULT_CONFIG: ConfigData = {
     timeout: 30,
     system_prompt: '',
   },
-  pdf: {
+  document: {
     vision: 'auto',
     vision_provider: 'gemini',
+    text_quality_threshold: 0.2,
   },
   naming: {
     template: '{date}_{company}_{doctype}',

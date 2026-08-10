@@ -9,7 +9,7 @@ const TEXT_EXTENSIONS: &[&str] = &[
     "txt", "csv", "md", "rtf", "json", "xml", "html", "htm",
 ];
 
-const OFFICE_EXTENSIONS: &[&str] = &["docx", "xlsx", "pptx"];
+const OFFICE_EXTENSIONS: &[&str] = &["docx", "xlsx", "pptx", "doc", "xls", "ppt"];
 
 pub fn is_image_extension(path: &str) -> bool {
     let ext = std::path::Path::new(path)
@@ -369,6 +369,12 @@ pub fn extract_text_from_file(path: &str) -> Result<(String, f64, String), Strin
         "pdf" => {
             let text = extract_text_from_pdf(&bytes)?;
             (text, "pdf_extract".to_string())
+        }
+        "doc" | "xls" | "ppt" => {
+            return Err(format!(
+                "Legacy Office format '{}' requires vision AI for text extraction",
+                ext
+            ));
         }
         _ => {
             return Err(format!("Unsupported file type for local extraction: {}", ext));

@@ -17,8 +17,8 @@ export function renderAboutView(root: HTMLElement): void {
       <div class="about-header">
         <h1>AutoRename-Revived</h1>
         <p class="about-tagline">
-          AI-powered PDF auto-renamer.<br>
-          Extracts company name, date, and document type from PDFs.
+          AI-powered document auto-renamer.<br>
+          Extracts company name, date, and document type from PDFs, Word docs, spreadsheets, presentations, images, and text files.
         </p>
         <p class="about-version">v${version}</p>
       </div>

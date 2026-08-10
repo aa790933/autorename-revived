@@ -36,14 +36,14 @@ pub fn validate_supported_extension(path: &str) -> bool {
 
     matches!(
         ext.as_str(),
-        "pdf" | "docx" | "xlsx" | "pptx" | "csv" | "txt" | "md" | "rtf" | "png" | "jpg" | "jpeg" | "tiff" | "tif" | "bmp" | "gif" | "webp"
+        "pdf" | "docx" | "doc" | "xlsx" | "xls" | "pptx" | "ppt" | "csv" | "txt" | "md" | "rtf" | "html" | "htm" | "json" | "xml" | "png" | "jpg" | "jpeg" | "tiff" | "tif" | "bmp" | "gif" | "webp"
     )
 }
 
 pub fn get_supported_extensions() -> Vec<&'static str> {
     vec![
-        ".pdf", ".docx", ".xlsx", ".pptx", ".csv", ".txt", ".md", ".rtf",
-        ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif", ".webp",
+        ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".csv", ".txt", ".md", ".rtf",
+        ".html", ".htm", ".json", ".xml", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif", ".webp",
     ]
 }
 

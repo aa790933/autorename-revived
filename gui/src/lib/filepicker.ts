@@ -1,17 +1,13 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { readDir } from '@tauri-apps/plugin-fs';
-import { SUPPORTED_EXTENSIONS } from './utils';
-
-function isSupported(name: string): boolean {
-  return SUPPORTED_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
-}
+import { SUPPORTED_EXTENSIONS, isSupportedFile } from './utils';
 
 export async function expandFolder(folderPath: string): Promise<string[]> {
   const clean = folderPath.replace(/[\\/]+$/, '');
   const sep = clean.includes('\\') ? '\\' : '/';
   const entries = await readDir(clean);
   return entries
-    .filter((e) => e.isFile && isSupported(e.name))
+    .filter((e) => e.isFile && isSupportedFile(e.name))
     .map((e) => clean + sep + e.name);
 }
 

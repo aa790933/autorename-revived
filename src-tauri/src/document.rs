@@ -29,7 +29,7 @@ pub struct FileResult {
 pub struct BatchResult {
     pub success: bool,
     pub total: usize,
-    pub renamed: usize,
+    pub completed: usize,
     pub skipped: usize,
     pub failed: usize,
     pub files: Vec<FileResult>,
@@ -277,7 +277,7 @@ pub fn generate_filename(
     let suffix = Path::new(original_filename)
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()))
-        .unwrap_or_else(|| String::from(".pdf"));
+        .unwrap_or_default();
 
     let has_content = !company.is_empty() || !doctype.is_empty() || !date_str.is_empty() || !original_filename.is_empty();
     let template = if has_content {

@@ -56,7 +56,7 @@ pub fn run() {
             apply_rename_cmd,
             save_rename_to_history_cmd,
             undo_last_rename_cmd,
-            rename_pdfs,
+            rename_files,
             undo_rename,
             cancel_rename,
             get_config,
@@ -258,7 +258,7 @@ fn undo_last_rename_cmd(
 }
 
 #[tauri::command]
-async fn rename_pdfs(
+async fn rename_files(
     app: tauri::AppHandle,
     paths: Vec<String>,
     options: serde_json::Value,
@@ -282,7 +282,7 @@ async fn rename_pdfs(
 
     let vision_ai_config = {
         let mut vc = config.ai.clone();
-        vc.provider = config.pdf.vision_provider.clone();
+        vc.provider = config.document.vision_provider.clone();
         if let Some(ref prov) = provider_override {
             vc.provider = prov.clone();
         }
@@ -297,7 +297,7 @@ async fn rename_pdfs(
     let mut result = BatchResult {
         success: true,
         total: paths.len(),
-        renamed: 0,
+        completed: 0,
         skipped: 0,
         failed: 0,
         files: Vec::new(),
@@ -398,7 +398,7 @@ async fn rename_pdfs(
             continue;
         }
 
-        let use_vision = match config.pdf.vision.as_str() {
+        let use_vision = match config.document.vision.as_str() {
             "true" => true,
             "false" => false,
             _ => false,
@@ -441,7 +441,7 @@ async fn rename_pdfs(
                         method,
                         quality
                     );
-                    if quality >= config.pdf.text_quality_threshold && !use_vision {
+                    if quality >= config.document.text_quality_threshold && !use_vision {
                         ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
                     } else {
                         ai::extract_metadata_vision_multi(
@@ -464,7 +464,7 @@ async fn rename_pdfs(
             }
         } else {
             tracing::warn!(
-                "Unsupported file extension for {} — treating as vision AI input",
+                "Unsupported file type for local extraction — treating as vision AI input: {}",
                 path
             );
             ai::extract_metadata_vision_multi(
@@ -660,7 +660,7 @@ async fn rename_pdfs(
 
         result.files.push(FileResult {
             file: path.clone(),
-            status: "renamed".to_string(),
+            status: "completed".to_string(),
             new_name: Some(final_name),
             new_path: Some(new_path),
             error: None,
@@ -673,7 +673,7 @@ async fn rename_pdfs(
             suggestion_names: suggestion_names.clone(),
             suggestion_languages: suggestion_lang_labels.clone(),
         });
-        result.renamed += 1;
+        result.completed += 1;
     }
 
     result.success = result.failed == 0;

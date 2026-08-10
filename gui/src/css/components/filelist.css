@@ -1,9 +1,9 @@
 /**
  * File Queue List — status-driven file list for rename operations.
  *
- * States: pending → preview (dry-run) → renamed/failed/skipped
+ * States: pending → processing → preview (dry-run) → completed/failed/skipped
  * Layout: [dot] filename [badge]
- *                → new name (if preview/renamed)
+ *                → new name (if preview/completed)
  *                error message (if failed)
  */
 
@@ -107,7 +107,7 @@
   animation: pulse 1.2s ease-in-out infinite;
 }
 
-.fq-dot-renamed {
+.fq-dot-completed {
   background: var(--color-success);
 }
 
@@ -163,7 +163,7 @@
   color: var(--color-info, #06b6d4);
 }
 
-.fq-new-name-renamed {
+.fq-new-name-completed {
   color: var(--color-success);
 }
 
@@ -233,12 +233,17 @@
   color: var(--text-tertiary);
 }
 
+.fq-badge-processing {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
 .fq-badge-preview {
   color: var(--color-info, #06b6d4);
   background: color-mix(in srgb, var(--color-info, #06b6d4) 12%, transparent);
 }
 
-.fq-badge-renamed {
+.fq-badge-completed {
   color: var(--color-success);
   background: color-mix(in srgb, var(--color-success) 12%, transparent);
 }

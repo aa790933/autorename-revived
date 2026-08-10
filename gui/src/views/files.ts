@@ -1,7 +1,7 @@
 import { getState, subscribe, addFiles, clearFiles, setState, updateFileStatuses } from '../lib/state';
 import { setupDragDrop } from '../lib/dnd';
 import { pickFiles, pickFolder } from '../lib/filepicker';
-import { renamePdfs, undoRename, cancelRename, isErrorResult, getUndoLogDir } from '../lib/sidecar';
+import { renameFiles, undoRename, cancelRename, isErrorResult, getUndoLogDir } from '../lib/sidecar';
 import { applyCachedRenames } from '../lib/rename-cache';
 import { getConfigSync } from '../lib/config-store';
 import { showToast } from '../lib/toast';
@@ -19,7 +19,7 @@ export function renderFilesView(root: HTMLElement): void {
   cleanupDnd = setupDragDrop(
     (paths) => {
       if (paths.length > 0) addFiles(paths);
-      else showToast('No PDF files in drop', 'warning');
+      else showToast('No supported files in drop', 'warning');
     },
     (hovering) => {
       const dropZone = container.querySelector('.drop-zone');
@@ -68,7 +68,7 @@ function renderEmpty(): void {
           <line x1="15" y1="15" x2="12" y2="12"/>
         </svg>
         <p class="text-[var(--text-secondary)] text-center">
-          Drop PDF files here<br>
+          Drop PDF, Word, Excel, PowerPoint, image, and text files here<br>
           <span class="text-sm text-[var(--text-tertiary)]">or click to browse</span>
         </p>
         <div class="flex gap-3 mt-2">
@@ -102,7 +102,7 @@ function renderEmpty(): void {
 // File row rendering helpers
 // ---------------------------------------------------------------------------
 
-function fileVisualState(f: FileEntry): 'pending' | 'preview' | 'renamed' | 'failed' | 'skipped' {
+function fileVisualState(f: FileEntry): 'pending' | 'processing' | 'preview' | 'completed' | 'failed' | 'skipped' {
   if (f.status === 'pending' && f.result?.new_name) return 'preview';
   return f.status;
 }
@@ -117,8 +117,8 @@ function renderFileRow(f: FileEntry): string {
   const badgeLabel = vs === 'preview' ? 'preview' : f.status;
 
   let detail = '';
-  if (newName && (vs === 'preview' || vs === 'renamed')) {
-    const nameClass = vs === 'preview' ? 'fq-new-name-preview' : 'fq-new-name-renamed';
+  if (newName && (vs === 'preview' || vs === 'completed')) {
+    const nameClass = vs === 'preview' ? 'fq-new-name-preview' : 'fq-new-name-completed';
     let suggestionsHtml = '';
     const suggestionNames = f.result?.suggestion_names ?? [];
     const suggestionLanguages = f.result?.suggestion_languages ?? [];
@@ -275,9 +275,9 @@ async function runRename(dryRun: boolean): Promise<void> {
       updateFileStatuses(batch, false);
       setState({ lastResult: batch, dryRunResult: null, lastBatchId: batch.batch_id ?? null });
       if (batch.failed > 0) {
-        showToast(`${batch.renamed} renamed, ${batch.failed} failed`, 'warning');
+        showToast(`${batch.completed} completed, ${batch.failed} failed`, 'warning');
       } else {
-        showToast(`${batch.renamed} files renamed successfully`, 'success');
+        showToast(`${batch.completed} files renamed successfully`, 'success');
       }
     } catch (err) {
       setState({ processing: false, progress: '' });
@@ -296,9 +296,12 @@ async function runRename(dryRun: boolean): Promise<void> {
 
   setState({ processing: true, progress: 'Starting...' });
 
+  const pendingFiles = state.files.filter((f) => f.status === 'pending' || f.status === 'skipped');
+  setState({ files: pendingFiles.map((f) => ({ ...f, status: 'processing' as const })) });
+
   let result: SidecarResult;
   try {
-    result = await renamePdfs(
+    result = await renameFiles(
       paths,
       { dryRun, provider: getConfigSync().ai.provider },
     );
@@ -315,7 +318,7 @@ async function runRename(dryRun: boolean): Promise<void> {
       showToast(`Error: ${errStr}`, 'danger');
     }
     // Mark all pending files as failed so they don't stay stuck
-    const updated = state.files.map((f) => (f.status === 'pending' || f.status === 'skipped')
+    const updated = state.files.map((f) => (f.status === 'pending' || f.status === 'skipped' || f.status === 'processing')
       ? { ...f, status: 'failed' as const }
       : f);
     setState({ files: updated });
@@ -348,24 +351,24 @@ async function runRename(dryRun: boolean): Promise<void> {
 
   if (dryRun) {
     setState({ dryRunResult: batch });
-    if (batch.renamed === 0 && batch.skipped > 0) {
+    if (batch.completed === 0 && batch.skipped > 0) {
       showToast('Preview: all files already correctly named', 'info');
     } else {
-      showToast(`Preview: ${batch.renamed} to rename, ${batch.skipped} to skip`, 'info');
+      showToast(`Preview: ${batch.completed} to process, ${batch.skipped} to skip`, 'info');
     }
   } else {
     // Only enable undo when files were actually renamed
-    if (batch.renamed > 0) {
+    if (batch.completed > 0) {
       setState({ lastResult: batch, lastBatchId: batch.batch_id ?? null });
     } else {
       setState({ lastResult: batch, lastBatchId: null });
     }
     if (batch.failed > 0) {
-      showToast(`${batch.renamed} renamed, ${batch.failed} failed`, 'warning');
-    } else if (batch.renamed === 0 && batch.skipped > 0) {
+      showToast(`${batch.completed} completed, ${batch.failed} failed`, 'warning');
+    } else if (batch.completed === 0 && batch.skipped > 0) {
       showToast('All files already correctly named', 'info');
     } else {
-      showToast(`${batch.renamed} files renamed successfully`, 'success');
+      showToast(`${batch.completed} files renamed successfully`, 'success');
     }
     // Surface per-file warnings (e.g. extraction failures)
     const allWarnings = batch.files.flatMap((f) => f.warnings ?? []);

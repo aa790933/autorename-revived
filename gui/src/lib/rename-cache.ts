@@ -66,7 +66,7 @@ export async function applyCachedRenames(
   onProgress?: (msg: string) => void,
 ): Promise<BatchResult> {
   const results: FileResult[] = [];
-  let renamed = 0;
+  let completed = 0;
   let skipped = 0;
   let failed = 0;
   const undoEntries: Array<{ old_path: string; new_path: string; timestamp: string }> = [];
@@ -90,8 +90,8 @@ export async function applyCachedRenames(
 
     try {
       await fsRename(entry.path, cached.new_path);
-      renamed++;
-      results.push({ ...cached, status: 'renamed' });
+      completed++;
+      results.push({ ...cached, status: 'completed' });
       undoEntries.push({
         old_path: entry.path,
         new_path: cached.new_path,
@@ -118,5 +118,5 @@ export async function applyCachedRenames(
     } catch { /* undo log write failure is non-critical */ }
   }
 
-  return { success: failed === 0, total, renamed, skipped, failed, files: results, dry_run: false, batch_id: batchId };
+  return { success: failed === 0, total, completed, skipped, failed, files: results, dry_run: false, batch_id: batchId };
 }

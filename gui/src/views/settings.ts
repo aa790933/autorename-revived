@@ -50,8 +50,9 @@ const COMMON_AI_FIELDS: FieldDef[] = [
 ];
 
 const DOCUMENT_FIELDS: FieldDef[] = [
-  { key: 'vision', label: 'Vision (scanned docs)', type: 'auto-or-bool', hint: 'auto = use AI vision for scanned pages', configKey: 'pdf' },
-  { key: 'vision_provider', label: 'Vision Provider', type: 'string', hint: 'AI provider for image/vision extraction (e.g. gemini, openai, anthropic)', configKey: 'pdf' },
+  { key: 'vision', label: 'Vision (scanned docs)', type: 'auto-or-bool', hint: 'auto = use AI vision for scanned pages / legacy formats', configKey: 'document' },
+  { key: 'vision_provider', label: 'Vision Provider', type: 'string', hint: 'AI provider for image/vision extraction (e.g. gemini, openai, anthropic)', configKey: 'document' },
+  { key: 'text_quality_threshold', label: 'Text Quality Threshold', type: 'number', hint: 'Minimum text quality (0.0-1.0) for local extraction; below this, uses vision AI', configKey: 'document' },
 ];
 
 const NAMING_FIELDS: FieldDef[] = [

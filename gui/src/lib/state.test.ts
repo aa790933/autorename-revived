@@ -20,13 +20,13 @@ beforeEach(() => {
 // Helper to build a BatchResult matching CLI output format
 // ---------------------------------------------------------------------------
 function makeBatchResult(
-  files: Array<{ file: string; status: 'renamed' | 'skipped' | 'failed'; new_name?: string }>,
+  files: Array<{ file: string; status: 'completed' | 'skipped' | 'failed'; new_name?: string }>,
   dryRun = false,
 ): BatchResult {
   return {
     success: files.every((f) => f.status !== 'failed'),
     total: files.length,
-    renamed: files.filter((f) => f.status === 'renamed').length,
+    completed: files.filter((f) => f.status === 'completed').length,
     skipped: files.filter((f) => f.status === 'skipped').length,
     failed: files.filter((f) => f.status === 'failed').length,
     dry_run: dryRun,
@@ -55,13 +55,13 @@ describe('updateFileStatuses — path matching', () => {
   it('matches when paths are identical (Linux/macOS)', () => {
     addFiles(['/home/user/invoice.pdf']);
     const batch = makeBatchResult([
-      { file: '/home/user/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: '/home/user/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ]);
 
     updateFileStatuses(batch, false);
 
     const state = getState();
-    expect(state.files[0].status).toBe('renamed');
+    expect(state.files[0].status).toBe('completed');
     expect(state.files[0].result?.new_name).toBe('20250101 ACME Invoice.pdf');
   });
 
@@ -71,25 +71,25 @@ describe('updateFileStatuses — path matching', () => {
 
     // Python CLI normalizes to forward slashes: os.path.abspath().replace("\\", "/")
     const batch = makeBatchResult([
-      { file: 'D:/Documents/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: 'D:/Documents/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ]);
 
     updateFileStatuses(batch, false);
 
     const state = getState();
     // This FAILS with the current code — file stays 'pending'
-    expect(state.files[0].status).toBe('renamed');
+    expect(state.files[0].status).toBe('completed');
   });
 
   it('handles mixed-case drive letters', () => {
     addFiles(['d:\\Documents\\invoice.pdf']);
     const batch = makeBatchResult([
-      { file: 'D:/Documents/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: 'D:/Documents/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ]);
 
     updateFileStatuses(batch, false);
 
-    expect(getState().files[0].status).toBe('renamed');
+    expect(getState().files[0].status).toBe('completed');
   });
 });
 
@@ -100,7 +100,7 @@ describe('updateFileStatuses — dry run flag', () => {
   it('keeps status as pending during dry run but stores result', () => {
     addFiles(['/home/user/invoice.pdf']);
     const batch = makeBatchResult([
-      { file: '/home/user/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: '/home/user/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ], true);
 
     updateFileStatuses(batch, true);
@@ -110,15 +110,15 @@ describe('updateFileStatuses — dry run flag', () => {
     expect(file.result?.new_name).toBe('20250101 ACME Invoice.pdf');
   });
 
-  it('updates status to renamed for real rename', () => {
+  it('updates status to completed for real rename', () => {
     addFiles(['/home/user/invoice.pdf']);
     const batch = makeBatchResult([
-      { file: '/home/user/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: '/home/user/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ]);
 
     updateFileStatuses(batch, false);
 
-    expect(getState().files[0].status).toBe('renamed');
+    expect(getState().files[0].status).toBe('completed');
   });
 
   it('dry run followed by real rename updates status correctly', () => {
@@ -126,17 +126,17 @@ describe('updateFileStatuses — dry run flag', () => {
 
     // Step 1: dry run
     const dryBatch = makeBatchResult([
-      { file: '/home/user/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: '/home/user/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ], true);
     updateFileStatuses(dryBatch, true);
     expect(getState().files[0].status).toBe('pending');
 
     // Step 2: real rename
     const realBatch = makeBatchResult([
-      { file: '/home/user/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: '/home/user/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
     ]);
     updateFileStatuses(realBatch, false);
-    expect(getState().files[0].status).toBe('renamed');
+    expect(getState().files[0].status).toBe('completed');
   });
 });
 
@@ -226,17 +226,17 @@ describe('updateFileStatuses — dry run terminal states', () => {
     expect(getState().files[0].status).toBe('failed');
   });
 
-  it('mixed batch: renamed stays pending, skipped becomes skipped during dry run', () => {
+  it('mixed batch: completed stays pending, skipped becomes skipped during dry run', () => {
     addFiles(['/home/user/invoice.pdf', '/home/user/already-named.pdf']);
     const batch = makeBatchResult([
-      { file: '/home/user/invoice.pdf', status: 'renamed', new_name: '20250101 ACME Invoice.pdf' },
+      { file: '/home/user/invoice.pdf', status: 'completed', new_name: '20250101 ACME Invoice.pdf' },
       { file: '/home/user/already-named.pdf', status: 'skipped' },
     ], true);
 
     updateFileStatuses(batch, true);
 
     const files = getState().files;
-    expect(files[0].status).toBe('pending'); // renamed stays pending in dry run
+    expect(files[0].status).toBe('pending'); // completed stays pending in dry run
     expect(files[1].status).toBe('skipped'); // skipped becomes skipped immediately
   });
 });

@@ -1,11 +1,6 @@
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { expandFolder } from './filepicker';
-import { SUPPORTED_EXTENSIONS } from './utils';
-
-function isSupportedFile(path: string): boolean {
-  const ext = path.toLowerCase().replace(/.*[.](\w+)$/, '.$1');
-  return SUPPORTED_EXTENSIONS.includes(ext);
-}
+import { isSupportedFile } from './utils';
 
 export function setupDragDrop(
   onDrop: (paths: string[]) => void,

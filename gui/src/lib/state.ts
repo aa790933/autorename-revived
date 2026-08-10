@@ -5,7 +5,7 @@ export type AppView = 'files' | 'settings' | 'about';
 export interface FileEntry {
   path: string;
   name: string;
-  status: 'pending' | 'renamed' | 'skipped' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'skipped' | 'failed';
   result?: FileResult;
 }
 
@@ -76,7 +76,7 @@ export function updateFileStatuses(result: BatchResult, isDryRun = false): void 
     if (fileResult) {
       return {
         ...entry,
-        status: isDryRun && fileResult.status === 'renamed'
+        status: isDryRun && fileResult.status === 'completed'
           ? entry.status
           : (fileResult.status as FileEntry['status']),
         result: fileResult,

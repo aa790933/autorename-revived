@@ -3,7 +3,7 @@ import { appDataDir } from '@tauri-apps/api/path';
 
 export interface FileResult {
   file: string;
-  status: 'renamed' | 'skipped' | 'failed';
+  status: 'completed' | 'skipped' | 'failed';
   new_name: string | null;
   new_path: string | null;
   error: string | null;
@@ -20,7 +20,7 @@ export interface FileResult {
 export interface BatchResult {
   success: boolean;
   total: number;
-  renamed: number;
+  completed: number;
   skipped: number;
   failed: number;
   files: FileResult[];
@@ -68,7 +68,7 @@ export function isErrorResult(result: SidecarResult): result is ErrorResult {
   return !result.success && 'error_type' in result;
 }
 
-export async function renamePdfs(
+export async function renameFiles(
   paths: string[],
   options: {
     dryRun?: boolean;
@@ -80,7 +80,7 @@ export async function renamePdfs(
   } = {},
 ): Promise<SidecarResult> {
   try {
-    const result = await invoke<BatchResult>('rename_pdfs', {
+    const result = await invoke<BatchResult>('rename_files', {
       paths,
       options,
     });
