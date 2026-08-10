@@ -183,13 +183,11 @@ function renderFileList(state: AppState): void {
     const cancelDisabled = !busy;
     actionsHtml = `
       <div class="fq-actions-left">
+        <button class="btn btn-error btn-sm" id="btn-cancel" ${cancelDisabled ? 'disabled' : ''}>Cancel</button>
         <button class="btn btn-secondary btn-sm" id="btn-dry-run" ${blocked ? 'disabled' : ''}>Dry Run</button>
         <button class="btn btn-primary btn-sm" id="btn-rename" ${blocked ? 'disabled' : ''}>
           Rename ${pendingCount} File${pendingCount !== 1 ? 's' : ''}
         </button>
-      </div>
-      <div class="fq-actions-right">
-        <button class="btn btn-error btn-sm" id="btn-cancel" ${cancelDisabled ? 'disabled' : ''}>Cancel</button>
       </div>`;
   }
 
@@ -316,6 +314,11 @@ async function runRename(dryRun: boolean): Promise<void> {
       setState({ processing: false, progress: '' });
       showToast(`Error: ${errStr}`, 'danger');
     }
+    // Mark all pending files as failed so they don't stay stuck
+    const updated = state.files.map((f) => (f.status === 'pending' || f.status === 'skipped')
+      ? { ...f, status: 'failed' as const }
+      : f);
+    setState({ files: updated });
     return;
   }
 

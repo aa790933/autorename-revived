@@ -336,10 +336,9 @@ async fn rename_pdfs(
             move || std::fs::read(path)
         })
         .await
-        .map_err(|e| e.to_string())?
         {
-            Ok(b) => b,
-            Err(e) => {
+            Ok(Ok(b)) => b,
+            Ok(Err(e)) => {
                 result.files.push(FileResult {
                     file: path.clone(),
                     status: "failed".to_string(),
@@ -387,8 +386,14 @@ async fn rename_pdfs(
                 let file_path = path.clone();
                 move || extractors::extract_text_from_file(&file_path)
             })
-            .await
-            .map_err(|e| e.to_string())?;
+            .await;
+            let local_result = match local_result {
+                Ok(inner) => inner,
+                Err(join_err) => {
+                    tracing::warn!("spawn_blocking failed for {}: {} — falling back to vision AI", path, join_err);
+                    Err(join_err.to_string())
+                }
+            };
             match local_result {
                 Ok((text, quality, method)) => {
                     tracing::info!(
@@ -419,6 +424,10 @@ async fn rename_pdfs(
                 }
             }
         } else {
+            tracing::warn!(
+                "Unsupported file extension for {} — treating as vision AI input",
+                path
+            );
             ai::extract_metadata_vision_multi(
                 &[(path.clone(), file_bytes.clone())],
                 &vision_ai_config,
@@ -427,7 +436,12 @@ async fn rename_pdfs(
             .await
         };
 
-        let primary_meta = all_metadata.first().cloned().unwrap_or_default();
+        let primary_meta = if all_metadata.is_empty() {
+            tracing::warn!("All AI metadata extractions returned empty for {}", path);
+            DocumentMetadata::default()
+        } else {
+            all_metadata.first().cloned().unwrap_or_default()
+        };
         let suggestion_metas: Vec<ai::DocumentMetadata> = all_metadata.into_iter().skip(1).collect();
 
         let ai_failed = primary_meta.company_name.is_empty()
@@ -561,12 +575,16 @@ async fn rename_pdfs(
         if !dry_run {
             let old_path = path.clone();
             let new_path_clone = new_path.clone();
-            if let Err(e) = tokio::task::spawn_blocking(move || {
+            let rename_result = tokio::task::spawn_blocking(move || {
                 document::apply_rename(&old_path, &new_path_clone, false)
             })
-            .await
-            .map_err(|e| e.to_string())?
-            {
+            .await;
+            let rename_err = match rename_result {
+                Ok(Ok(())) => None,
+                Ok(Err(e)) => Some(e),
+                Err(join_err) => Some(format!("Rename task failed: {}", join_err)),
+            };
+            if let Some(e) = rename_err {
                 result.files.push(FileResult {
                     file: path.clone(),
                     status: "failed".to_string(),
@@ -591,12 +609,11 @@ async fn rename_pdfs(
                 let old_path = path.clone();
                 let new_path_clone2 = new_path.clone();
                 let batch_id_clone = batch_id.clone();
-                if let Err(e) = tokio::task::spawn_blocking(move || {
+                let history_result = tokio::task::spawn_blocking(move || {
                     document::save_rename_to_history(&old_path, &new_path_clone2, &history_path, &batch_id_clone)
                 })
-                .await
-                .map_err(|e| e.to_string())?
-                {
+                .await;
+                if let Err(e) = history_result {
                     tracing::warn!("Failed to save undo history: {}", e);
                 }
             }
