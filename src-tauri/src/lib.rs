@@ -378,6 +378,26 @@ async fn rename_pdfs(
             }
         };
 
+        if is_cancelled() {
+            result.files.push(FileResult {
+                file: path.clone(),
+                status: "failed".to_string(),
+                new_name: None,
+                new_path: None,
+                error: Some("Rename cancelled by user".to_string()),
+                warnings: vec![],
+                company: None,
+                date: None,
+                doc_type: None,
+                provider: None,
+                model: None,
+                suggestion_names: vec![],
+                suggestion_languages: vec![],
+            });
+            result.failed += 1;
+            continue;
+        }
+
         let use_vision = match config.pdf.vision.as_str() {
             "true" => true,
             "false" => false,
@@ -742,7 +762,7 @@ fn reset_cancel_flag() {
     CANCEL_RENAME.store(false, Ordering::SeqCst);
 }
 
-fn is_cancelled() -> bool {
+pub(crate) fn is_cancelled() -> bool {
     CANCEL_RENAME.load(Ordering::SeqCst)
 }
 

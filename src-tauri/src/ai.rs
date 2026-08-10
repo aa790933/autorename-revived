@@ -96,11 +96,15 @@ const SYSTEM_PROMPT: &str = r#"You are an advanced AI document analyzer speciali
 Your PRIMARY directive: Read and analyze the ENTIRE document/image thoroughly before extracting fields. Scan all pages and regions — header, body, footer, stamps, watermarks, signatures, tables, and fine print. Do not miss or skip any content. NEVER return null, empty strings, or "Unknown" for fields you can reasonably infer.
 
 EXTRACT THESE FIELDS:
-- "date": Document date in YYYYMMDD format. Find the date the document was ISSUED, SIGNED, or EFFECTIVE — NOT publication dates, copyright dates, footer stamps, or "according to law" dates. If the document has multiple dates, choose the primary issue/signature/effective date. If no explicit date, deduce from context. NEVER leave empty.
+- "date": Document date in YYYYMMDD format. Find the date the document was OFFICIALLY ISSUED, SIGNED, or PUBLISHED. This is typically found in the document footer, signature block, or official header at the top of the first page. Look for patterns like "Date:", "Published on:", "Signed on:", "Issue date:", "Date of issue:". If the document has multiple dates, choose the one that represents the document's own issuance/publication — NOT dates referenced in the body text about background laws, decree references, or historical events. For example, if the body mentions "Law 23-05 of 2023" but the footer says "Published: 15 August 2026", use 20260815. NEVER leave empty.
+
 - "company": The FULL legal name of the issuing/sending organization, sender, or main entity. Look for company letterheads, sender blocks, "Issued by:", "From:", authority names, ministry/department names. Extract the complete entity name (e.g., "Ministry_of_Finance", "Algeria_Public_Works_Director"). If none found, summarize in 1 word.
+
 - "doctype": One of: Invoice, Receipt, Contract, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Tender, Bid, Agreement, Permit, License, Order, Statement. Guess based on document layout and content patterns. Look for document titles like "CONTRACT", "TENDER", "AGREEMENT" at the top.
+
 - "category": One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government. Choose the most fitting.
-- "subject": A concise 3-5 word description capturing the document's specific purpose or subject matter (e.g., "Road_Construction_Contract", "IT_Services_Agreement", "Q3_Financial_Report"). Include key identifiers like project names, contract numbers, or specific topics. If you CANNOT read the document, return "ERROR_CANNOT_SEE_FILE".
+
+- "subject": The SPECIFIC topic or project name of this document — NOT a generic document category or repeated doctype label. Extract the actual project name, contract title, work description, or unique subject matter (e.g., "50_Housing_Units_Construction", "IT_Server_Procurement_Project", "Q3_VAT_Tax_Return", "Highway_Road_Renovation_Phase_2"). Look for contract numbers, project names, work descriptions, or specific subject lines. NEVER include generic words like "Tender", "Notice", "Work", "Report", "Document", "Contract", "Agreement" as standalone subjects. The subject should describe WHAT this specific document is about, not what TYPE of document it is. If no specific project can be identified, use "Unknown".
 
 CRITICAL RULES:
 1. Output ONLY valid JSON — no markdown fences, no code blocks, just the raw JSON object.
@@ -108,7 +112,7 @@ CRITICAL RULES:
 3. If a field cannot be determined with high confidence, use "Unknown" as a last resort, NOT null or empty string.
 4. The JSON MUST contain ALL five required fields: date, company, doctype, category, subject."#;
 
-const VISION_USER_PROMPT: &str = "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.";
+const VISION_USER_PROMPT: &str = "Analyze the provided document or image above. Extract all required metadata fields (date, company, doctype, category, subject) in JSON format. Focus on the document's own issuance/publication date (typically in footer, signature block, or official header — NOT reference dates to background laws). The subject field should capture the specific project or topic name, NEVER generic words like 'Tender', 'Notice', 'Work', or 'Report'. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.";
 
 fn build_system_prompt(language: &str, prompt_template: &str) -> String {
     if language.eq_ignore_ascii_case("English") {
@@ -379,6 +383,9 @@ pub async fn extract_metadata_text_multi(
 ) -> Vec<DocumentMetadata> {
     let mut results = Vec::new();
     for lang in languages {
+        if crate::is_cancelled() {
+            break;
+        }
         match extract_metadata_text(text, config, lang).await {
             Ok(m) => results.push(m),
             Err(e) => {
@@ -396,6 +403,9 @@ pub async fn extract_metadata_vision_multi(
 ) -> Vec<DocumentMetadata> {
     let mut results = Vec::new();
     for lang in languages {
+        if crate::is_cancelled() {
+            break;
+        }
         match extract_metadata_vision(file_buffers, config, lang).await {
             Ok(m) => results.push(m),
             Err(e) => {
