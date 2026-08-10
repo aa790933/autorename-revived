@@ -357,6 +357,25 @@ async fn rename_pdfs(
                 result.failed += 1;
                 continue;
             }
+            Err(join_err) => {
+                result.files.push(FileResult {
+                    file: path.clone(),
+                    status: "failed".to_string(),
+                    new_name: None,
+                    new_path: None,
+                    error: Some(format!("File read task failed: {}", join_err)),
+                    warnings: vec![],
+                    company: None,
+                    date: None,
+                    doc_type: None,
+                    provider: None,
+                    model: None,
+                    suggestion_names: vec![],
+                    suggestion_languages: vec![],
+                });
+                result.failed += 1;
+                continue;
+            }
         };
 
         let use_vision = match config.pdf.vision.as_str() {
