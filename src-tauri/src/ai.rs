@@ -10,6 +10,21 @@ const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com";
 const OPENAI_API_BASE: &str = "https://api.openai.com";
 const XAI_API_BASE: &str = "https://api.x.ai";
 
+fn default_system_prompt() -> String {
+    r#"You are an advanced Universal Document Intelligence & Metadata Extraction Engine.
+
+Before generating any output, you must deeply analyze and understand the entire document content (including scanned images, Word docs, spreadsheets, and PDFs in any language).
+
+ANALYSIS & RENAMING INSTRUCTIONS:
+1. DEEP COMPREHENSION FIRST: Read the document completely to understand its true context, main purpose, issuing party, and exact subject matter.
+2. EXTRACT SPECIFIC METADATA for template `{date}_{subject}_{category}_{company}_{doctype}.pdf`:
+   - {date}: Extract the true issuance, publication, or signing date (YYYYMMDD). Ignore background legal decrees, reference numbers, or old law dates mentioned in the text.
+   - {subject}: Extract the specific project or subject matter. STRICT RULE: NEVER use generic words like "Tender", "Work", "Report", or "Notice". For example, if it is a tender document, specify the exact deal/project (e.g., "Solar_Panel_Installation", "IT_Server_Supply").
+   - {company}: The exact organization, ministry, or company issuing the document.
+   - {category}: The domain (e.g., "Procurement", "Finance", "Legal", "HR").
+   - {doctype}: The specific administrative document type (e.g., "Specifications", "Invoice", "CallForTenders", "Contract")."#.to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiConfig {
     pub provider: String,
@@ -22,7 +37,7 @@ pub struct AiConfig {
     pub custom_base_url: String,
     pub temperature: f64,
     pub timeout: u64,
-    #[serde(default)]
+    #[serde(default = "default_system_prompt")]
     pub system_prompt: String,
 }
 
@@ -39,7 +54,7 @@ impl Default for AiConfig {
             custom_base_url: String::new(),
             temperature: 0.0,
             timeout: 30,
-            system_prompt: String::new(),
+            system_prompt: default_system_prompt(),
         }
     }
 }
@@ -239,9 +254,17 @@ fn parse_gemini_response(text_resp: &str) -> Result<String, String> {
     let candidates = json["candidates"]
         .as_array()
         .ok_or("No candidates in response — the model may not exist or the request failed")?;
+    if candidates.is_empty() {
+        return Err(
+            "Empty candidates array in response — the model may have refused the request or content was filtered".to_string()
+        );
+    }
     let parts = candidates[0]["content"]["parts"]
         .as_array()
         .ok_or("No content parts in response")?;
+    if parts.is_empty() {
+        return Err("Empty content parts array in response".to_string());
+    }
     let result_text = parts[0]["text"]
         .as_str()
         .ok_or("No text field in response")?;
@@ -670,7 +693,11 @@ async fn openai_vision_extract(
         .map_err(|e| e.to_string())?;
 
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let result_text = json["choices"][0]["message"]["content"]
+    let choices = json["choices"].as_array().ok_or("No choices in response")?;
+    if choices.is_empty() {
+        return Err("Empty choices array in response — the API may have refused the request or content was filtered".to_string());
+    }
+    let result_text = choices[0]["message"]["content"]
         .as_str()
         .ok_or("No content in response")?;
 
@@ -713,7 +740,11 @@ async fn anthropic_text_extract(text: &str, config: &AiConfig, sys_prompt: &str)
         .map_err(|e| e.to_string())?;
 
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let result_text = json["content"][0]["text"].as_str().ok_or("No text in response")?;
+    let content_arr = json["content"].as_array().ok_or("No content array in response")?;
+    if content_arr.is_empty() {
+        return Err("Empty content array in response — the API may have refused the request or content was filtered".to_string());
+    }
+    let result_text = content_arr[0]["text"].as_str().ok_or("No text in response")?;
 
     let parsed = parse_json_response(result_text)?;
     Ok(data_to_metadata(&parsed))
@@ -773,7 +804,11 @@ async fn anthropic_vision_extract(
         .map_err(|e| e.to_string())?;
 
     let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let result_text = json["content"][0]["text"].as_str().ok_or("No text in response")?;
+    let content_arr = json["content"].as_array().ok_or("No content array in response")?;
+    if content_arr.is_empty() {
+        return Err("Empty content array in response — the API may have refused the request or content was filtered".to_string());
+    }
+    let result_text = content_arr[0]["text"].as_str().ok_or("No text in response")?;
 
     let parsed = parse_json_response(result_text)?;
     Ok(data_to_metadata(&parsed))

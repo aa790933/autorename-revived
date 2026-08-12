@@ -430,12 +430,13 @@ async fn rename_files(
                 result.failed += 1;
                 continue;
             }
-            ai::extract_metadata_vision_multi(
+            let vision_result = ai::extract_metadata_vision_multi(
                 &[(path.clone(), file_bytes.clone())],
                 &vision_ai_config,
                 &languages,
             )
-            .await
+            .await;
+            vision_result
         } else if extractors::is_text_extension(path) {
             if is_cancelled() {
                 result.files.push(FileResult {
@@ -457,7 +458,8 @@ async fn rename_files(
                 continue;
             }
             let text = String::from_utf8_lossy(&file_bytes).to_string();
-            ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
+            let text_result = ai::extract_metadata_text_multi(&text, &ai_config, &languages).await;
+            text_result
         } else if extractors::is_office_extension(path) || extractors::is_pdf_extension(path) {
             let local_result = tokio::task::spawn_blocking({
                 let file_path = path.clone();
@@ -480,24 +482,27 @@ async fn rename_files(
                         quality
                     );
                     if quality >= config.document.text_quality_threshold && !use_vision {
-                        ai::extract_metadata_text_multi(&text, &ai_config, &languages).await
+                        let text_result = ai::extract_metadata_text_multi(&text, &ai_config, &languages).await;
+                        text_result
                     } else {
-                        ai::extract_metadata_vision_multi(
+                        let vision_result = ai::extract_metadata_vision_multi(
                             &[(path.clone(), file_bytes.clone())],
                             &vision_ai_config,
                             &languages,
                         )
-                        .await
+                        .await;
+                        vision_result
                     }
                 }
                 Err(e) => {
                     tracing::warn!("Local extraction failed for {}: {}", path, e);
-                    ai::extract_metadata_vision_multi(
+                    let vision_result = ai::extract_metadata_vision_multi(
                         &[(path.clone(), file_bytes.clone())],
                         &vision_ai_config,
                         &languages,
                     )
-                    .await
+                    .await;
+                    vision_result
                 }
             }
         } else {
@@ -505,12 +510,13 @@ async fn rename_files(
                 "Unsupported file type for local extraction — treating as vision AI input: {}",
                 path
             );
-            ai::extract_metadata_vision_multi(
+            let vision_result = ai::extract_metadata_vision_multi(
                 &[(path.clone(), file_bytes.clone())],
                 &vision_ai_config,
                 &languages,
             )
-            .await
+            .await;
+            vision_result
         };
 
         // Early-exit check: if cancel was requested during AI extraction,
