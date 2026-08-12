@@ -18,6 +18,28 @@ let unsubscribe: (() => void) | undefined;
 // overwriting the cancelled state set in `handleCancel`.
 let cancelRequested = false;
 
+// Races an invoke promise against a watchdog timer. If the backend never
+// settles (crashes, is killed, or hangs despite server-side timeouts), the
+// timer rejects so the surrounding catch block can mark files as failed
+// instead of leaving them stuck in "processing".
+function withInvokeWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Operation timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 export function renderFilesView(root: HTMLElement): void {
   container = root;
 
@@ -322,9 +344,16 @@ async function runRename(dryRun: boolean): Promise<void> {
 
   let result: SidecarResult;
   try {
-    result = await renameFiles(
-      paths,
-      { dryRun, provider: getConfigSync().ai.provider },
+    const cfg = getConfigSync().ai;
+    // Per-request timeout from config (floored at 60s, matching the backend),
+    // multiplied by the number of files plus a fixed buffer. This watchdog
+    // guarantees the invoke always settles so files can never stay stuck in
+    // "processing" if the backend hangs or is killed.
+    const perFileMs = Math.max(cfg.timeout, 60) * 1000;
+    const watchdogMs = Math.max(perFileMs * paths.length + 60_000, 120_000);
+    result = await withInvokeWatchdog(
+      renameFiles(paths, { dryRun, provider: cfg.provider }),
+      watchdogMs,
     );
   } catch (err) {
     // If the user cancelled, swallow the error — state was already reset
