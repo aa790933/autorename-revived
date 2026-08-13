@@ -526,7 +526,7 @@ async fn rename_files(
                                 provider: Some(ai_config.provider.clone()),
                                 model: Some(current_model.clone()),
                                 suggestion_names: vec![],
-                                suggestion_languages: suggestion_lang_labels.clone(),
+                                suggestion_languages: vec![],
                             });
                             result.failed += 1;
                             continue;

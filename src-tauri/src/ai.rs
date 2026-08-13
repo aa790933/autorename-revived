@@ -306,7 +306,7 @@ fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
     let bool_re = regex::Regex::new(r#""(is_unreadable_or_error)""\s*:\s*(true|false)"#).unwrap();
     for caps in bool_re.captures_iter(text) {
         let key = caps[1].to_lowercase();
-        let val = caps[2] == "true";
+        let val = caps[2] == *"true";
         data.insert(key, serde_json::Value::Bool(val));
     }
 

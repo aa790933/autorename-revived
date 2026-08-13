@@ -403,10 +403,10 @@ pub fn generate_filename(
 
     let fields: HashMap<String, String> = [
         ("date".to_string(), date_formatted),
-        ("company".to_string(), clean_company),
-        ("doctype".to_string(), clean_doctype),
-        ("subject".to_string(), clean_subject),
-        ("original".to_string(), original_stem),
+        ("company".to_string(), clean_company.clone()),
+        ("doctype".to_string(), clean_doctype.clone()),
+        ("subject".to_string(), clean_subject.clone()),
+        ("original".to_string(), original_stem.clone()),
         ("sequence".to_string(), format!("_{:0width$}", 1, width = seq_width)),
     ]
     .into_iter()
@@ -421,9 +421,9 @@ pub fn generate_filename(
     if result == template.as_str() || result.trim().is_empty() {
         let fallback_fields: HashMap<String, String> = [
             ("date".to_string(), fields["date"].clone()),
-            ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
-            ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
-            ("subject".to_string(), if clean_subject.is_empty() { "Unknown".to_string() } else { clean_subject.clone() }),
+            ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company }),
+            ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype }),
+            ("subject".to_string(), if clean_subject.is_empty() { "Unknown".to_string() } else { clean_subject }),
             ("original".to_string(), original_stem),
             ("sequence".to_string(), format!("_{:0width$}", 1, width = seq_width)),
         ]
