@@ -152,7 +152,7 @@ pub fn get_all_languages(primary: &str, suggestions: &[String]) -> Vec<String> {
 }
 
 fn build_text_prompt(system_prompt: &str, text: &str) -> String {
-    format!("{}\n\nDocument text:\n{}\n\nAfter completing full document comprehension (Step 1), output the metadata JSON (Step 2).", system_prompt, text)
+    format!("{}\n\nDocument text:\n{}\n\nExtract the metadata JSON now.", system_prompt, text)
 }
 
 fn gemini_response_schema() -> serde_json::Value {
@@ -359,7 +359,7 @@ pub async fn extract_metadata_text(
     let start = Instant::now();
     info!("AI text extraction: provider={}, model={}, language={}", provider, config.model, language);
 
-    let sys_prompt = build_system_prompt(language, &config.system_prompt);
+    let sys_prompt = build_system_prompt(language, &default_system_prompt());
     let result = match provider.as_str() {
         "gemini" => gemini_text_extract(text, config, &sys_prompt).await,
         "openai" => openai_text_extract(text, config, &sys_prompt).await,
@@ -381,7 +381,7 @@ pub async fn extract_metadata_vision(
     let start = Instant::now();
     info!("AI vision extraction: provider={}, files={}, language={}", provider, file_buffers.len(), language);
 
-    let sys_prompt = build_system_prompt(language, &config.system_prompt);
+    let sys_prompt = build_system_prompt(language, &default_system_prompt());
     let user_prompt = build_vision_user_prompt(language);
     let result = match provider.as_str() {
         "gemini" => gemini_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
@@ -406,9 +406,13 @@ pub async fn extract_metadata_text_multi(
             break;
         }
         match extract_metadata_text(text, config, lang).await {
-            Ok(m) => results.push(m),
+            Ok(m) => {
+                tracing::info!("Text extraction succeeded for lang '{}': company='{}', date='{}', type='{}', subject='{}'",
+                    lang, m.company_name, m.document_date, m.document_type, m.subject);
+                results.push(m);
+            }
             Err(e) => {
-                tracing::warn!("AI text extraction failed for language {}: {}", lang, e);
+                tracing::error!("AI text extraction FAILED for language '{}': {}", lang, e);
             }
         }
     }
@@ -426,9 +430,13 @@ pub async fn extract_metadata_vision_multi(
             break;
         }
         match extract_metadata_vision(file_buffers, config, lang).await {
-            Ok(m) => results.push(m),
+            Ok(m) => {
+                tracing::info!("Vision extraction succeeded for lang '{}': company='{}', date='{}', type='{}', subject='{}'",
+                    lang, m.company_name, m.document_date, m.document_type, m.subject);
+                results.push(m);
+            }
             Err(e) => {
-                tracing::warn!("AI vision extraction failed for language {}: {}", lang, e);
+                tracing::error!("AI vision extraction FAILED for language '{}': {}", lang, e);
             }
         }
     }

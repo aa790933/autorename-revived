@@ -616,8 +616,8 @@ async fn rename_files(
 
         let ai_warning = if meta_is_error {
             Some(format!(
-                "AI metadata extraction failed for {} — file named with defaults. Check your API key, model name, and provider settings.",
-                path
+                "AI metadata extraction failed for {} — company='{}', doctype='{}', date='{}', subject='{}', unreadable={}. Check your API key, model name, and provider settings.",
+                path, &primary_meta.company_name, &primary_meta.document_type, &primary_meta.document_date, &primary_meta.subject, primary_meta.is_unreadable_or_error
             ))
         } else {
             None
