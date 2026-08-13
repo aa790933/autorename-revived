@@ -944,10 +944,10 @@ fn data_to_metadata(data: &HashMap<String, serde_json::Value>) -> DocumentMetada
         .unwrap_or(false);
 
     let meta = DocumentMetadata {
-        company_name: extract_str_field(data, "issuer_entity_short", ""),
-        document_date: extract_str_field(data, "date_YYYY_MM_DD", ""),
-        document_type: extract_str_field(data, "document_nature", ""),
-        subject: extract_str_field(data, "specific_subject", ""),
+        company_name: extract_str_field_any(data, &["issuer_entity_short", "company"], ""),
+        document_date: extract_str_field_any(data, &["date_YYYY_MM_DD", "date"], ""),
+        document_type: extract_str_field_any(data, &["document_nature", "doctype"], ""),
+        subject: extract_str_field_any(data, &["specific_subject", "subject"], ""),
         is_unreadable_or_error: is_unreadable,
     };
 
@@ -972,6 +972,20 @@ fn extract_str_field(
         .filter(|s| !s.trim().is_empty())
         .map(|s| s.trim().to_string())
         .unwrap_or_else(|| default_value.to_string())
+}
+
+/// Like extract_str_field but tries multiple keys in order (new name, then legacy aliases).
+fn extract_str_field_any(
+    data: &HashMap<String, serde_json::Value>,
+    keys: &[&str],
+    default_value: &str,
+) -> String {
+    for key in keys {
+        if let Some(val) = data.get(*key).and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty()) {
+            return val.trim().to_string();
+        }
+    }
+    default_value.to_string()
 }
 
 pub async fn test_connection(
