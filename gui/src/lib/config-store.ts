@@ -1,32 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export interface FileResult {
-  file: string;
-  status: 'completed' | 'skipped' | 'failed';
-  new_name: string | null;
-  new_path: string | null;
-  error: string | null;
-  warnings: string[];
-  company: string | null;
-  date: string | null;
-  doc_type: string | null;
-  provider: string | null;
-  model: string | null;
-  suggestion_names: string[];
-  suggestion_languages: string[];
-}
-
-export interface BatchResult {
-  success: boolean;
-  total: number;
-  completed: number;
-  skipped: number;
-  failed: number;
-  files: FileResult[];
-  dry_run: boolean;
-  batch_id?: string;
-}
-
 export interface ConfigData {
   ai: {
     provider: string;
@@ -135,6 +108,15 @@ export async function loadConfig(): Promise<ConfigData> {
 
 export function getConfigSync(): ConfigData {
   return _config;
+}
+
+/**
+ * Force re-read config from disk. Useful when the config file may have been
+ * modified externally (e.g. portable mode settings change).
+ */
+export async function reloadConfig(): Promise<ConfigData> {
+  _loaded = false;
+  return loadConfig();
 }
 
 export async function saveConfig(config: ConfigData): Promise<void> {

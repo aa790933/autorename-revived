@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getState, setState, addFiles, clearFiles, updateFileStatuses, subscribe } from './state';
-import type { BatchResult } from './sidecar';
+import type { BatchResult } from './types';
 
 // Reset state before each test
 beforeEach(() => {

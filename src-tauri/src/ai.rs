@@ -447,8 +447,7 @@ async fn gemini_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) ->
     };
 
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(config.timeout))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -512,7 +511,6 @@ async fn gemini_vision_extract(
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -609,8 +607,7 @@ async fn openai_text_extract(text: &str, config: &AiConfig, sys_prompt: &str) ->
     };
 
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(config.timeout))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -661,7 +658,6 @@ async fn openai_vision_extract(
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -721,8 +717,7 @@ async fn anthropic_text_extract(text: &str, config: &AiConfig, sys_prompt: &str)
     };
 
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(config.timeout))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -773,7 +768,6 @@ async fn anthropic_vision_extract(
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -833,8 +827,7 @@ async fn openai_compat_text_extract(text: &str, config: &AiConfig, sys_prompt: &
     let api_key = config.api_key.trim();
 
     let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(config.timeout))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -886,7 +879,6 @@ async fn openai_compat_vision_extract(
 
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(config.timeout.max(60)))
-        .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
 

@@ -9,7 +9,7 @@ const TEXT_EXTENSIONS: &[&str] = &[
     "txt", "csv", "md", "rtf", "json", "xml", "html", "htm",
 ];
 
-const OFFICE_EXTENSIONS: &[&str] = &["docx", "xlsx", "pptx", "doc", "xls", "ppt"];
+const OFFICE_EXTENSIONS: &[&str] = &["docx", "xlsx", "pptx", "pptm", "doc", "xls", "ppt"];
 
 pub fn is_image_extension(path: &str) -> bool {
     let ext = std::path::Path::new(path)
@@ -362,7 +362,7 @@ pub fn extract_text_from_file(path: &str) -> Result<(String, f64, String), Strin
             let text = extract_text_from_xlsx(&bytes)?;
             (text, "xlsx_extract".to_string())
         }
-        "pptx" => {
+        "pptx" | "pptm" => {
             let text = extract_text_from_pptx(&bytes)?;
             (text, "pptx_extract".to_string())
         }

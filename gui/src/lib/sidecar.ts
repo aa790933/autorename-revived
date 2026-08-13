@@ -1,56 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir } from '@tauri-apps/api/path';
+import type { BatchResult, ErrorResult, SidecarResult, UndoResult, FileResult } from './types';
 
-export interface FileResult {
-  file: string;
-  status: 'completed' | 'skipped' | 'failed';
-  new_name: string | null;
-  new_path: string | null;
-  error: string | null;
-  warnings: string[];
-  company: string | null;
-  date: string | null;
-  doc_type: string | null;
-  provider: string | null;
-  model: string | null;
-  suggestion_names: string[];
-  suggestion_languages: string[];
-}
-
-export interface BatchResult {
-  success: boolean;
-  total: number;
-  completed: number;
-  skipped: number;
-  failed: number;
-  files: FileResult[];
-  dry_run: boolean;
-  batch_id?: string;
-}
-
-export interface ErrorResult {
-  success: false;
-  error_type: string;
-  message: string;
-  suggestion: string;
-}
-
-export type SidecarResult = BatchResult | ErrorResult;
-
-export interface UndoFileResult {
-  old_path: string;
-  new_path: string;
-  status: 'restored' | 'failed';
-  error?: string;
-}
-
-export interface UndoResult {
-  success: boolean;
-  restored: number;
-  failed: number;
-  files: UndoFileResult[];
-  batch_id?: string;
-}
+export type { BatchResult, ErrorResult, SidecarResult, UndoResult, FileResult };
 
 export interface ConfigValidation {
   valid: boolean;
@@ -155,21 +107,6 @@ export async function testApiConnection(
       latency_ms: 0,
       provider: provider || '',
     };
-  }
-}
-
-export async function saveConfig(
-  key: string,
-  value: string,
-): Promise<{ success: boolean; saved_path?: string; error?: string }> {
-  try {
-    const result = await invoke<{ success: boolean; saved_path?: string; error?: string }>('save_config', {
-      key,
-      value,
-    });
-    return result;
-  } catch (e) {
-    return { success: false, error: String(e) };
   }
 }
 

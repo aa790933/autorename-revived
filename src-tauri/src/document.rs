@@ -170,7 +170,12 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
     };
 
     let cleaned = if cleaned.len() > max_length {
-        cleaned[..max_length].to_string()
+        // Use char-boundary-aware truncation to avoid panicking on multi-byte UTF-8
+        let mut end = max_length;
+        while end > 0 && !cleaned.is_char_boundary(end) {
+            end -= 1;
+        }
+        cleaned[..end].to_string()
     } else {
         cleaned
     };
@@ -347,7 +352,12 @@ pub fn generate_filename(
 
     let avail = config.max_length as usize - suffix.len();
     if avail < 4 {
-        format!("{}{}", &result[..avail.min(result.len())], suffix)
+        // Use char-boundary-aware truncation to avoid panicking on multi-byte UTF-8
+        let mut end = avail.min(result.len());
+        while end > 0 && !result.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}{}", &result[..end], suffix)
     } else {
         format!("{}{}", result, suffix)
     }
@@ -386,7 +396,10 @@ pub fn ensure_unique_filename(directory: &str, filename: &str, zerofill: u32) ->
         }
         counter += 1;
         if counter > 9999 {
-            return new_name;
+            // Append a timestamp-based suffix as a last resort to guarantee uniqueness
+            let ts = chrono::Local::now().format(r#"%Y%m%dT%H%M%S"#);
+            let fallback = format!("{}_{ts}{}", stem, ext);
+            return fallback;
         }
     }
 }

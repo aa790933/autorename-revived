@@ -1,4 +1,4 @@
-import type { FileResult, BatchResult } from './sidecar';
+import type { FileResult, BatchResult } from './types';
 
 export type AppView = 'files' | 'settings' | 'about';
 

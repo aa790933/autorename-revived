@@ -1,7 +1,7 @@
 import { rename as fsRename, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
 import type { FileEntry } from './state';
-import type { BatchResult, FileResult } from './sidecar';
+import type { BatchResult, FileResult } from './types';
 
 function joinPath(dir: string, name: string): string {
   const sep = dir.includes('\\') ? '\\' : '/';
