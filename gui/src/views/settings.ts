@@ -56,7 +56,7 @@ const DOCUMENT_FIELDS: FieldDef[] = [
 ];
 
 const NAMING_FIELDS: FieldDef[] = [
-  { key: 'template', label: 'Filename Template', type: 'string', hint: '{date}, {company}, {doctype}, {category}, {subject}, {original}, {sequence}', configKey: 'naming' },
+  { key: 'template', label: 'Filename Template', type: 'string', hint: '{date}, {company}, {doctype}, {subject}, {original}, {sequence}', configKey: 'naming' },
   { key: 'fallback', label: 'Fallback Template', type: 'string', hint: 'Used when template yields empty name', configKey: 'naming' },
   { key: 'date_format', label: 'Date Format', type: 'string', hint: 'strftime format, e.g. %Y%m%d', configKey: 'naming' },
   { key: 'separator', label: 'Separator', type: 'string', configKey: 'naming' },

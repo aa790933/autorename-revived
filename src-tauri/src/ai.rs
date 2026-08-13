@@ -11,18 +11,26 @@ const OPENAI_API_BASE: &str = "https://api.openai.com";
 const XAI_API_BASE: &str = "https://api.x.ai";
 
 fn default_system_prompt() -> String {
-    r#"You are an advanced Universal Document Intelligence & Metadata Extraction Engine.
+    r#"You are an advanced, domain-agnostic Universal Document & File Intelligence Engine.
+Your task is to analyze ANY input file (Invoices, Checks, IDs, Contracts, Tenders, Receipts, Medical Reports, Letters, Photos, Screenshots, Code, etc.) and extract strict, precise metadata for automated file renaming.
 
-Before generating any output, you must deeply analyze and understand the entire document content (including scanned images, Word docs, spreadsheets, and PDFs in any language).
+CORE EXTRACTION RULES:
+1. DOMAIN ADAPTABILITY:
+   - For Financial/Administrative (Invoices, Receipts, Checks): Extract the vendor/bank/issuer, the exact document type, and the item/service/check-number.
+   - For Identity/Legal (IDs, Passports, Contracts, Decrees): Extract the issuing authority/person, type, and identifier/subject.
+    - For Visual Media (Photos, Screenshots, Artwork): Set document_nature to 'Photo' or 'Screenshot', and extract a 2-4 word visual description as specific_subject.
+   - For Technical/Academic (Reports, Papers, Code): Extract the main topic, organization, and document structure.
 
-ANALYSIS & RENAMING INSTRUCTIONS:
-1. DEEP COMPREHENSION FIRST: Read the document completely to understand its true context, main purpose, issuing party, and exact subject matter.
-2. EXTRACT SPECIFIC METADATA for template `{date}_{subject}_{category}_{company}_{doctype}.pdf`:
-   - {date}: Extract the true issuance, publication, or signing date (YYYYMMDD). Ignore background legal decrees, reference numbers, or old law dates mentioned in the text.
-   - {subject}: Extract the specific project or subject matter. STRICT RULE: NEVER use generic words like "Tender", "Work", "Report", or "Notice". For example, if it is a tender document, specify the exact deal/project (e.g., "Solar_Panel_Installation", "IT_Server_Supply").
-   - {company}: The exact organization, ministry, or company issuing the document.
-   - {category}: The domain (e.g., "Procurement", "Finance", "Legal", "HR").
-   - {doctype}: The specific administrative document type (e.g., "Specifications", "Invoice", "CallForTenders", "Contract")."#.to_string()
+2. STRICT SEPARATION & NO REDUNDANCY:
+   - 'document_nature' is the administrative/structural category (e.g., Invoice, Check, Contract, ID_Card, Photo).
+   - 'specific_subject' is the UNIQUE context or topic.
+   - RULE: 'specific_subject' MUST NEVER contain any words present in 'document_nature' or 'issuer_entity_short'.
+
+3. ENTITY CLEANING:
+   - Extract short, functional entity names. Strip legal prefixes/suffixes (e.g., use 'Amazon' instead of 'Amazon.com Services LLC', use 'DTP_Tebessa' instead of full official header).
+
+4. STRICT DATE FORMATTING:
+   - Output 'date_YYYY_MM_DD' in YYYY-MM-DD. Always pick the primary effective/issuance date (e.g., invoice date over due date). If no date exists (e.g., a photo), leave as empty string."#.to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,22 +69,16 @@ impl Default for AiConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentMetadata {
-    #[serde(default, rename = "company_name", alias = "company")]
+    #[serde(default, rename = "issuer_entity_short", alias = "company")]
     pub company_name: String,
-    #[serde(default, rename = "date", alias = "document_date")]
+    #[serde(default, rename = "date_YYYY_MM_DD", alias = "date")]
     pub document_date: String,
-    #[serde(default, rename = "doctype", alias = "document_type")]
+    #[serde(default, rename = "document_nature", alias = "doctype")]
     pub document_type: String,
-    #[serde(default)]
-    pub category: String,
-    #[serde(default)]
+    #[serde(default, rename = "specific_subject", alias = "subject")]
     pub subject: String,
     #[serde(default)]
-    pub confidence: f64,
-    #[serde(default)]
-    pub invoice_number: String,
-    #[serde(default)]
-    pub total_amount: String,
+    pub is_unreadable_or_error: bool,
 }
 
 impl Default for DocumentMetadata {
@@ -85,11 +87,8 @@ impl Default for DocumentMetadata {
             company_name: String::new(),
             document_date: String::new(),
             document_type: String::new(),
-            category: String::new(),
             subject: String::new(),
-            confidence: 0.0,
-            invoice_number: String::new(),
-            total_amount: String::new(),
+            is_unreadable_or_error: false,
         }
     }
 }
@@ -102,11 +101,14 @@ pub struct TestConnectionResult {
     pub provider: String,
 }
 
-const VISION_USER_PROMPT: &str = r#"STEP 1 — FULL DOCUMENT COMPREHENSION: Study the entire document/image thoroughly. Identify what this specific document is about (the actual subject/topic, not just the type), who issued/signed it, when it was officially issued/signed/published (distinguishing from background reference dates like laws or decrees mentioned in the body), and its administrative type and domain category.
+const VISION_USER_PROMPT: &str = r#"Analyze this document/image. Extract the following metadata fields as JSON:
+- date_YYYY_MM_DD: Primary issuance/effective date in YYYY-MM-DD format. If no date exists, use empty string.
+- issuer_entity_short: Short functional entity name (strip legal suffixes like 'LLC', 'Inc.'). If no issuer, use empty string.
+- document_nature: Administrative/structural type (e.g., Invoice, Contract, ID_Card, Photo, Receipt, Letter, Report).
+- specific_subject: 2-4 word description of the UNIQUE topic. Must NOT repeat words from document_nature or issuer_entity_short. If unreadable, describe what you see.
+- is_unreadable_or_error: Set to true if the document cannot be read or understood.
 
-STEP 2 — ACCURATE TEMPLATE POPULATION: Only after achieving full comprehension, extract the metadata fields in JSON format. Focus on the document's OWN issuance/publication date (typically in footer, signature block, or official header — NOT reference dates to background laws). The subject field should capture the specific project or topic name, NEVER generic words like 'Tender', 'Notice', 'Work', or 'Report'.
-
-Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field."#;
+Do NOT output anything except the JSON object. If you CANNOT read the document, set is_unreadable_or_error to true and provide best-effort values for the other fields."#;
 
 fn build_system_prompt(language: &str, prompt_template: &str) -> String {
     if language.eq_ignore_ascii_case("English") {
@@ -114,9 +116,8 @@ fn build_system_prompt(language: &str, prompt_template: &str) -> String {
     }
 
     format!(
-        "{}: Output all metadata field values in {} language. For doctype, use the {} translation of document type names (e.g., Invoice, Receipt, Contract, etc.). For category, use the {} translation of category names (e.g., Finance, Personal, Work, etc.).",
+        "{}\n\nIMPORTANT: Output all metadata field values in {} language. For document_nature, use the {} translation of document type names (e.g., Invoice, Receipt, Contract, etc.).",
         prompt_template,
-        language,
         language,
         language
     )
@@ -128,7 +129,14 @@ fn build_vision_user_prompt(language: &str) -> String {
     }
 
     format!(
-        "STEP 1 — FULL DOCUMENT COMPREHENSION: Study the entire document/image thoroughly. Identify what this specific document is about (the actual subject/topic, not just the type), who issued/signed it, when it was officially issued/signed/published (distinguishing from background reference dates like laws or decrees mentioned in the body), and its administrative type and domain category.\n\nSTEP 2 — ACCURATE TEMPLATE POPULATION: Only after achieving full comprehension, extract the metadata fields in JSON format. Output all metadata field values in {} language. Do NOT output anything except the JSON object. If you CANNOT read or see the document provided, return 'ERROR_CANNOT_SEE_FILE' in the 'subject' field.",
+        "Analyze this document/image. Extract the following metadata fields as JSON (output all values in {} language):
+- date_YYYY_MM_DD: Primary issuance/effective date in YYYY-MM-DD format. If no date exists, use empty string.
+- issuer_entity_short: Short functional entity name (strip legal suffixes like 'LLC', 'Inc.'). If no issuer, use empty string.
+- document_nature: Administrative/structural type (e.g., Invoice, Contract, ID_Card, Photo, Receipt, Letter, Report).
+- specific_subject: 2-4 word description of the UNIQUE topic. Must NOT repeat words from document_nature or issuer_entity_short. If unreadable, describe what you see.
+- is_unreadable_or_error: Set to true if the document cannot be read or understood.
+
+Do NOT output anything except the JSON object. If you CANNOT read the document, set is_unreadable_or_error to true and provide best-effort values for the other fields.",
         language
     )
 }
@@ -151,28 +159,29 @@ fn gemini_response_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "OBJECT",
         "properties": {
-            "date": {
+            "date_YYYY_MM_DD": {
                 "type": "STRING",
-                "description": "Document date in YYYYMMDD format. The date the document was issued, signed, or made effective — not publication or copyright dates."
+                "description": "Primary issuance/effective date in YYYY-MM-DD format. If no date exists, use empty string."
             },
-            "company": {
+            "issuer_entity_short": {
                 "type": "STRING",
-                "description": "Full legal name of the issuing/sending organization. Include ministry, department, or brand names. If none, summarize the main entity in 1 word."
+                "description": "Short functional entity name (strip legal suffixes like LLC, Inc.). If no issuer, use empty string."
             },
-            "doctype": {
+            "document_nature": {
                 "type": "STRING",
-                "description": "One of: Invoice, Receipt, Contract, Tender, Bid, Agreement, Report, ID, Image, Email, Letter, Form, Bill, Memo, Certificate, Permit, License, Order, Statement. Match the document's evident purpose."
+                "description": "Administrative/structural document type (e.g., Invoice, Contract, ID_Card, Photo, Receipt, Letter, Report, Certificate, Tender)."
             },
-            "category": {
+            "specific_subject": {
                 "type": "STRING",
-                "description": "One of: Finance, Personal, Work, Legal, Medical, Education, Receipt, Invoice, Utility, Tax, Tender, Contract, Government, Other. The broadest fitting category."
+                "description": "2-4 word description of the UNIQUE topic. Must NOT repeat words from document_nature or issuer_entity_short."
             },
-            "subject": {
-                "type": "STRING",
-                "description": "3-5 word summary of the document's specific subject. Include project names, contract numbers, or specific topics. Use underscores between words."
+            "is_unreadable_or_error": {
+                "type": "BOOLEAN",
+                "description": "Set to true if the document cannot be read or understood."
             }
         },
-        "required": ["date", "company", "doctype", "category", "subject"]
+        "required": ["date_YYYY_MM_DD", "issuer_entity_short", "document_nature", "specific_subject", "is_unreadable_or_error"],
+        "additionalProperties": false
     })
 }
 
@@ -293,11 +302,19 @@ fn parse_with_regex_fallback(text: &str) -> HashMap<String, serde_json::Value> {
         }
     }
 
+    // Handle boolean fields
+    let bool_re = regex::Regex::new(r#""(is_unreadable_or_error)""\s*:\s*(true|false)"#).unwrap();
+    for caps in bool_re.captures_iter(text) {
+        let key = caps[1].to_lowercase();
+        let val = caps[2] == "true";
+        data.insert(key, serde_json::Value::Bool(val));
+    }
+
     if data.is_empty() {
         let date_re = regex::Regex::new(r"(\d{4})[-/\.](\d{1,2})[-/\.](\d{1,2})").unwrap();
         if let Some(caps) = date_re.captures(text) {
-            let date = format!("{}{}{}", &caps[1], &caps[2], &caps[3]);
-            data.insert("date".to_string(), serde_json::Value::String(date));
+            let date = format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]);
+            data.insert("date_YYYY_MM_DD".to_string(), serde_json::Value::String(date));
         }
     }
 
@@ -584,11 +601,9 @@ async fn gemini_vision_extract(
 
     let parsed = parse_json_response(&result_text)?;
 
-    if let Some(subject_val) = parsed.get("subject") {
-        if let Some(subject_str) = subject_val.as_str() {
-            if subject_str.contains("ERROR_CANNOT_SEE_FILE") {
-                tracing::error!("Gemini reported it cannot see the file. Base64 data may be empty or MIME type mismatch.");
-            }
+    if let Some(unreadable) = parsed.get("is_unreadable_or_error").and_then(|v| v.as_bool()) {
+        if unreadable {
+            tracing::warn!("Gemini reported the document is unreadable. Base64 data may be empty or MIME type mismatch.");
         }
     }
 
@@ -923,26 +938,22 @@ async fn openai_compat_vision_extract(
 }
 
 fn data_to_metadata(data: &HashMap<String, serde_json::Value>) -> DocumentMetadata {
-    let confidence = data
-        .get("confidence")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0)
-        .clamp(0.0, 1.0);
+    let is_unreadable = data
+        .get("is_unreadable_or_error")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     let meta = DocumentMetadata {
-        company_name: extract_str_field(data, "company", "Unknown"),
-        document_date: extract_str_field(data, "date", ""),
-        document_type: extract_str_field(data, "doctype", "Unknown"),
-        category: extract_str_field(data, "category", "Unknown"),
-        subject: extract_str_field(data, "subject", "Unknown"),
-        confidence,
-        invoice_number: extract_str_field(data, "invoice_number", ""),
-        total_amount: extract_str_field(data, "total_amount", ""),
+        company_name: extract_str_field(data, "issuer_entity_short", ""),
+        document_date: extract_str_field(data, "date_YYYY_MM_DD", ""),
+        document_type: extract_str_field(data, "document_nature", ""),
+        subject: extract_str_field(data, "specific_subject", ""),
+        is_unreadable_or_error: is_unreadable,
     };
 
     tracing::debug!(
-        "Mapped metadata: date={}, company={}, doctype={}, category={}, subject={}",
-        meta.document_date, meta.company_name, meta.document_type, meta.category, meta.subject
+        "Mapped metadata: date={}, issuer={}, nature={}, subject={}, unreadable={}",
+        meta.document_date, meta.company_name, meta.document_type, meta.subject, meta.is_unreadable_or_error
     );
 
     meta

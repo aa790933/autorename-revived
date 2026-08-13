@@ -481,7 +481,58 @@ async fn rename_files(
                         method,
                         quality
                     );
-                    if quality >= config.document.text_quality_threshold && !use_vision {
+                    // FIX: If quality is 0.0 AND vision is disabled, return an error
+                    // instead of silently renaming with empty metadata.
+                    if quality == 0.0 && !use_vision {
+                        tracing::warn!(
+                            "PDF/image has no text layer (quality=0.0) and vision AI is disabled. \
+                             Enable Vision AI in settings to process scanned documents."
+                        );
+                        let mut warnings = vec![
+                            "PDF has no text layer. Enable Vision AI to process scanned documents.".to_string()
+                        ];
+                        // Still try text extraction (will likely fail, but we need metadata)
+                        let text_result = ai::extract_metadata_text_multi(&text, &ai_config, &languages).await;
+                        // If text extraction also returned empty metadata, mark as error
+                        let meta = text_result.first().cloned().unwrap_or_default();
+                        if meta.document_type.is_empty() && meta.company_name.is_empty() {
+                            // Return early with error
+                            let date = document::parse_document_date(&meta.document_date).unwrap_or_default();
+                            let new_name = document::generate_filename(
+                                &meta.company_name,
+                                &meta.document_type,
+                                &date,
+                                &meta.subject,
+                                &config.naming,
+                                path,
+                                true,
+                            );
+                            let ext = file_utils::get_file_extension(path);
+                            let final_name = if !ext.is_empty() && !new_name.ends_with(&format!(".{}", ext)) {
+                                format!("{}.{}", new_name, ext)
+                            } else {
+                                new_name
+                            };
+                            result.files.push(FileResult {
+                                file: path.clone(),
+                                status: "failed".to_string(),
+                                new_name: Some(final_name.clone()),
+                                new_path: None,
+                                error: Some("PDF has no text layer. Enable Vision AI to process scanned documents.".to_string()),
+                                warnings,
+                                company: None,
+                                date: None,
+                                doc_type: None,
+                                provider: Some(ai_config.provider.clone()),
+                                model: Some(current_model.clone()),
+                                suggestion_names: vec![],
+                                suggestion_languages: suggestion_lang_labels.clone(),
+                            });
+                            result.failed += 1;
+                            continue;
+                        }
+                        text_result
+                    } else if quality >= config.document.text_quality_threshold && !use_vision {
                         let text_result = ai::extract_metadata_text_multi(&text, &ai_config, &languages).await;
                         text_result
                     } else {
@@ -549,10 +600,21 @@ async fn rename_files(
         };
         let suggestion_metas: Vec<ai::DocumentMetadata> = all_metadata.into_iter().skip(1).collect();
 
-        let ai_failed = primary_meta.company_name.is_empty()
-            && primary_meta.document_type.is_empty()
-            && primary_meta.document_date.is_empty();
-        let ai_warning = if ai_failed {
+        // Post-extraction validation
+        let company = document::harmonize_company_name(
+            &primary_meta.company_name,
+            &config.harmonized_companies,
+        );
+        let date = document::parse_document_date(&primary_meta.document_date).unwrap_or_default();
+        let (meta_is_error, meta_warnings) = document::validate_metadata(
+            &company,
+            &primary_meta.document_type,
+            &date,
+            &primary_meta.subject,
+            primary_meta.is_unreadable_or_error,
+        );
+
+        let ai_warning = if meta_is_error {
             Some(format!(
                 "AI metadata extraction failed for {} — file named with defaults. Check your API key, model name, and provider settings.",
                 path
@@ -560,20 +622,15 @@ async fn rename_files(
         } else {
             None
         };
-        let company = document::harmonize_company_name(
-            &primary_meta.company_name,
-            &config.harmonized_companies,
-        );
-        let date = document::parse_document_date(&primary_meta.document_date).unwrap_or_default();
 
         let new_name = document::generate_filename(
             &company,
             &primary_meta.document_type,
             &date,
-            &primary_meta.category,
             &primary_meta.subject,
             &config.naming,
             path,
+            primary_meta.is_unreadable_or_error,
         );
 
         let suggestion_names: Vec<String> = suggestion_metas
@@ -585,10 +642,10 @@ async fn rename_files(
                     &s_company,
                     &sm.document_type,
                     &s_date,
-                    &sm.category,
                     &sm.subject,
                     &config.naming,
                     path,
+                    sm.is_unreadable_or_error,
                 );
                 let s_ext = file_utils::get_file_extension(path);
                 let s_final = if !s_ext.is_empty() && !s_name.ends_with(&format!(".{}", s_ext)) {

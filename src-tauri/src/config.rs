@@ -51,9 +51,9 @@ fn default_suggestion_languages() -> Vec<String> {
 impl Default for NamingConfig {
     fn default() -> Self {
         Self {
-            template: "{date}_{company}_{doctype}".to_string(),
-            fallback: "{date}_Unknown_{doctype}".to_string(),
-            date_format: String::from("%Y%m%d"),
+            template: "{date}_{doctype}_{company}_{subject}".to_string(),
+            fallback: "{date}_{doctype}_{company}_Unknown".to_string(),
+            date_format: String::from("%Y-%m-%d"),
             separator: String::from("_"),
             max_length: 128,
             sequence_zerofill: 2,

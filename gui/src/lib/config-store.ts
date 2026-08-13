@@ -51,18 +51,15 @@ const DEFAULT_CONFIG: ConfigData = {
     custom_base_url: '',
      temperature: 0.0,
     timeout: 30,
-    system_prompt: `You are an advanced Universal Document Intelligence & Metadata Extraction Engine.
+    system_prompt: `Analyze this document thoroughly. Extract the following metadata fields as JSON:
 
-Before generating any output, you must deeply analyze and understand the entire document content (including scanned images, Word docs, spreadsheets, and PDFs in any language).
+- date_YYYY_MM_DD: Primary issuance/effective date in YYYY-MM-DD format. If no date exists, use empty string.
+- issuer_entity_short: Short functional entity name (strip legal suffixes like 'LLC', 'Inc.'). If no issuer, use empty string.
+- document_nature: Administrative/structural type (e.g., Invoice, Contract, ID_Card, Photo, Receipt, Letter, Report).
+- specific_subject: 2-4 word description of the UNIQUE topic. Must NOT repeat words from document_nature or issuer_entity_short.
+- is_unreadable_or_error: Set to true if the document cannot be read or understood.
 
-ANALYSIS & RENAMING INSTRUCTIONS:
-1. DEEP COMPREHENSION FIRST: Read the document completely to understand its true context, main purpose, issuing party, and exact subject matter.
-2. EXTRACT SPECIFIC METADATA for template \`{date}_{subject}_{category}_{company}_{doctype}.pdf\`:
-   - {date}: Extract the true issuance, publication, or signing date (YYYYMMDD). Ignore background legal decrees, reference numbers, or old law dates mentioned in the text.
-   - {subject}: Extract the specific project or subject matter. STRICT RULE: NEVER use generic words like "Tender", "Work", "Report", or "Notice". For example, if it is a tender document, specify the exact deal/project (e.g., "Solar_Panel_Installation", "IT_Server_Supply").
-   - {company}: The exact organization, ministry, or company issuing the document.
-   - {category}: The domain (e.g., "Procurement", "Finance", "Legal", "HR").
-   - {doctype}: The specific administrative document type (e.g., "Specifications", "Invoice", "CallForTenders", "Contract").`,
+Do NOT output anything except the JSON object. If you CANNOT read the document, set is_unreadable_or_error to true and provide best-effort values for the other fields.`,
   },
   document: {
     vision: 'auto',
@@ -70,9 +67,9 @@ ANALYSIS & RENAMING INSTRUCTIONS:
     text_quality_threshold: 0.2,
   },
   naming: {
-    template: '{date}_{company}_{doctype}',
-    fallback: '{date}_Unknown_{doctype}',
-    date_format: '%Y%m%d',
+    template: '{date}_{doctype}_{company}_{subject}',
+    fallback: '{date}_{doctype}_{company}_Unknown',
+    date_format: '%Y-%m-%d',
     separator: '_',
     max_length: 128,
     sequence_zerofill: 2,

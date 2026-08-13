@@ -6,6 +6,36 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+/// Truncate a string to max_len characters (char-boundary safe).
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        return s.to_string();
+    }
+    let mut end = max_len;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s[..end].to_string()
+}
+
+/// Simple random helpers (no external crate needed).
+fn rand_u32() -> u32 {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let s = RandomState::new();
+    let mut h = s.build_hasher();
+    h.write_u64(unsafe { std::ptr::read(&h as *const _ as *const u64) });
+    h.finish() as u32
+}
+
+fn rand_u16() -> u16 {
+    rand_u32() as u16
+}
+
+fn rand_u48() -> u64 {
+    rand_u32() as u64 | ((rand_u32() as u64) << 32)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileResult {
     pub file: String,
@@ -219,24 +249,69 @@ pub fn parse_document_date(date_str: &str) -> Option<String> {
         return None;
     }
 
-    let cleaned = date_str.replace('-', "").replace('/', "").replace(' ', "");
-    if cleaned.len() == 8 && cleaned.chars().all(|c| c.is_ascii_digit()) {
-        return Some(cleaned);
-    }
-
+    // Accept YYYY-MM-DD format directly (new schema standard)
     if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, r#"%Y-%m-%d"#) {
-        return Some(parsed.format(r#"%Y%m%d"#).to_string());
+        return Some(parsed.format(r#"%Y-%m-%d"#).to_string());
     }
 
+    // Accept YYYYMMDD format (legacy)
+    let compact = date_str.replace('-', "").replace('/', "").replace(' ', "");
+    if compact.len() == 8 && compact.chars().all(|c| c.is_ascii_digit()) {
+        let y = &compact[0..4];
+        let m = &compact[4..6];
+        let d = &compact[6..8];
+        return Some(format!("{}-{}-{}", y, m, d));
+    }
+
+    // Accept MM/DD/YYYY format
     if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, r#"%m/%d/%Y"#) {
-        return Some(parsed.format(r#"%Y%m%d"#).to_string());
+        return Some(parsed.format(r#"%Y-%m-%d"#).to_string());
     }
 
+    // Accept DD/MM/YYYY format
     if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, r#"%d/%m/%Y"#) {
-        return Some(parsed.format(r#"%Y%m%d"#).to_string());
+        return Some(parsed.format(r#"%Y-%m-%d"#).to_string());
     }
 
     None
+}
+
+/// Validates extracted metadata and returns warnings/errors.
+/// Returns (is_error, warnings) where is_error means the metadata is unusable.
+pub fn validate_metadata(
+    company: &str,
+    doctype: &str,
+    date_str: &str,
+    subject: &str,
+    is_unreadable: bool,
+) -> (bool, Vec<String>) {
+    let mut warnings = Vec::new();
+    let mut is_error = false;
+
+    if is_unreadable {
+        warnings.push("Document was flagged as unreadable by AI".to_string());
+        is_error = true;
+    }
+
+    if company.is_empty() && doctype.is_empty() && date_str.is_empty() {
+        warnings.push("AI returned no usable metadata — using defaults".to_string());
+        is_error = true;
+    }
+
+    // Validate date format: must be YYYY-MM-DD or empty
+    if !date_str.is_empty() {
+        let date_re = Regex::new(r#"^\d{4}-\d{2}-\d{2}$"#).unwrap();
+        if !date_re.is_match(date_str) {
+            warnings.push(format!("Invalid date format '{}' — expected YYYY-MM-DD", date_str));
+        }
+    }
+
+    // Validate subject length (max 30 chars)
+    if subject.len() > 30 {
+        warnings.push(format!("Subject truncated from {} to 30 chars", subject.len()));
+    }
+
+    (is_error, warnings)
 }
 
 pub fn harmonize_company_name(
@@ -274,39 +349,50 @@ pub fn generate_filename(
     company: &str,
     doctype: &str,
     date_str: &str,
-    category: &str,
     subject: &str,
     config: &NamingConfig,
     original_filename: &str,
+    is_unreadable: bool,
 ) -> String {
     let suffix = Path::new(original_filename)
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()))
         .unwrap_or_default();
 
-    let has_content = !company.is_empty() || !doctype.is_empty() || !date_str.is_empty() || !original_filename.is_empty();
+    // If the document is unreadable, return a predefined error filename
+    if is_unreadable {
+        let uuid = format!(
+            "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
+            rand_u32(), rand_u16(), rand_u16(), rand_u16(), rand_u48()
+        );
+        return format!("Error_Unreadable_File_{}{}", &uuid[..8], suffix);
+    }
+
+    let has_content = !company.is_empty() || !doctype.is_empty() || !date_str.is_empty();
     let template = if has_content {
         &config.template
     } else {
         &config.fallback
     };
 
-    let date_formatted = if date_str.len() == 8 && date_str.chars().all(|c| c.is_ascii_digit()) {
-        date_str.to_string()
+    let date_formatted = if date_str.is_empty() {
+        String::new()
     } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, r#"%Y-%m-%d"#) {
-        parsed.format(&config.date_format).to_string()
-    } else if let Ok(parsed) = NaiveDate::parse_from_str(date_str, r#"%d/%m/%Y"#) {
-        parsed.format(&config.date_format).to_string()
-    } else if date_str.is_empty() {
-        "Unknown".to_string()
+        parsed.format(r#"%Y-%m-%d"#).to_string()
+    } else if date_str.len() == 8 && date_str.chars().all(|c| c.is_ascii_digit()) {
+        let y = &date_str[0..4];
+        let m = &date_str[4..6];
+        let d = &date_str[6..8];
+        format!("{}-{}-{}", y, m, d)
     } else {
-        "Unknown".to_string()
+        String::new()
     };
 
-    let clean_company = sanitize_filename(company, 48);
-    let clean_doctype = sanitize_filename(doctype, 48);
-    let clean_category = sanitize_filename(category, 48);
-    let clean_subject = sanitize_filename(subject, 48);
+    let clean_company = sanitize_filename(company, 32);
+    let clean_doctype = sanitize_filename(doctype, 24);
+    // Truncate subject to 30 chars max (char-boundary safe)
+    let subject_truncated = truncate_str(subject, 30);
+    let clean_subject = sanitize_filename(&subject_truncated, 32);
 
     let original_stem = Path::new(original_filename)
         .file_stem()
@@ -316,12 +402,11 @@ pub fn generate_filename(
     let seq_width = config.sequence_zerofill as usize;
 
     let fields: HashMap<String, String> = [
-        ("date".to_string(), date_formatted.clone()),
-        ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
-        ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
-        ("category".to_string(), if clean_category.is_empty() { "Unknown".to_string() } else { clean_category.clone() }),
-        ("subject".to_string(), if clean_subject.is_empty() { "Unknown".to_string() } else { clean_subject.clone() }),
-        ("original".to_string(), original_stem.clone()),
+        ("date".to_string(), date_formatted),
+        ("company".to_string(), clean_company),
+        ("doctype".to_string(), clean_doctype),
+        ("subject".to_string(), clean_subject),
+        ("original".to_string(), original_stem),
         ("sequence".to_string(), format!("_{:0width$}", 1, width = seq_width)),
     ]
     .into_iter()
@@ -332,14 +417,14 @@ pub fn generate_filename(
         result = result.replace(&format!("{{{}}}", key), val);
     }
 
-    if result == template.as_str() || result.is_empty() {
+    // If template had no matching placeholders or result is empty, use fallback
+    if result == template.as_str() || result.trim().is_empty() {
         let fallback_fields: HashMap<String, String> = [
-            ("date".to_string(), date_formatted.clone()),
+            ("date".to_string(), fields["date"].clone()),
             ("company".to_string(), if clean_company.is_empty() { "Unknown".to_string() } else { clean_company.clone() }),
             ("doctype".to_string(), if clean_doctype.is_empty() { "Doc".to_string() } else { clean_doctype.clone() }),
-            ("category".to_string(), if clean_category.is_empty() { "Unknown".to_string() } else { clean_category.clone() }),
             ("subject".to_string(), if clean_subject.is_empty() { "Unknown".to_string() } else { clean_subject.clone() }),
-            ("original".to_string(), original_stem.clone()),
+            ("original".to_string(), original_stem),
             ("sequence".to_string(), format!("_{:0width$}", 1, width = seq_width)),
         ]
         .into_iter()
@@ -350,9 +435,14 @@ pub fn generate_filename(
         }
     }
 
+    // Clean up double underscores/separators in the final result
+    let multi_sep = Regex::new(r#"_{2,}"#).unwrap();
+    let result = multi_sep.replace_all(&result, "_");
+    let result = result.trim_matches('_').trim_matches(' ').trim_matches('.').to_string();
+    let result = if result.is_empty() { "Unknown".to_string() } else { result };
+
     let avail = config.max_length as usize - suffix.len();
     if avail < 4 {
-        // Use char-boundary-aware truncation to avoid panicking on multi-byte UTF-8
         let mut end = avail.min(result.len());
         while end > 0 && !result.is_char_boundary(end) {
             end -= 1;
