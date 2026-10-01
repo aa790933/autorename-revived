@@ -1,129 +1,114 @@
+/**
+ * Thin typed wrappers over the Rust IPC commands.
+ *
+ * Every wrapper maps 1:1 to a `#[tauri::command]` in `src-tauri/src/lib.rs`.
+ * Tauri converts camelCase JavaScript argument keys to the snake_case Rust
+ * parameter names, so `{ batchId }` reaches `batch_id` and `{ apiKey }`
+ * reaches `api_key`.
+ */
 import { invoke } from '@tauri-apps/api/core';
-import { appDataDir } from '@tauri-apps/api/path';
-import type { BatchResult, ErrorResult, SidecarResult, UndoResult, FileResult } from './types';
+import type {
+  BatchResult,
+  ConfigBatchResult,
+  ConfigUpdate,
+  ConfigValidation,
+  TestConnectionResult,
+  UndoResult,
+} from './types';
 
-export type { BatchResult, ErrorResult, SidecarResult, UndoResult, FileResult };
+export type {
+  BatchResult,
+  ConfigBatchResult,
+  ConfigUpdate,
+  ConfigValidation,
+  FileResult,
+  TestConnectionResult,
+  UndoFileResult,
+  UndoResult,
+} from './types';
 
-export interface ConfigValidation {
-  valid: boolean;
-  issues: Array<{ field: string; level: string; message: string }>;
+export interface RenameOptions {
+  dryRun?: boolean;
+  provider?: string;
 }
 
-export interface TestConnectionResult {
-  success: boolean;
-  message: string;
-  latency_ms: number;
-  provider: string;
-}
-
-export function isErrorResult(result: SidecarResult): result is ErrorResult {
-  return !result.success && 'error_type' in result;
-}
-
-export async function renameFiles(
+/**
+ * Run the rename pipeline.
+ *
+ * Rejects when the backend itself fails (config could not be read, history
+ * could not be loaded); per-file problems are reported inside the returned
+ * `BatchResult.files` rather than thrown.
+ */
+export function renameFiles(
   paths: string[],
-  options: {
-    dryRun?: boolean;
-    recursive?: boolean;
-    provider?: string;
-    model?: string;
-    vision?: boolean;
-    textOnly?: boolean;
-  } = {},
-): Promise<SidecarResult> {
-  try {
-    const result = await invoke<BatchResult>('rename_files', {
-      paths,
-      options,
-    });
-    return result;
-  } catch (e) {
-    return {
-      success: false,
-      error_type: 'sidecar_error',
-      message: String(e),
-      suggestion: '',
-    } as ErrorResult;
-  }
+  options: RenameOptions = {},
+): Promise<BatchResult> {
+  return invoke<BatchResult>('rename_files', { paths, options });
 }
 
+/** Ask the running batch to stop. Always resolves; the flag is idempotent. */
 export function cancelRename(): Promise<boolean> {
   return invoke<boolean>('cancel_rename');
 }
 
-export async function undoRename(batchId?: string): Promise<UndoResult | ErrorResult> {
-  try {
-    const result = await invoke<UndoResult>('undo_rename', { batchId });
-    return result;
-  } catch (e) {
-    throw new Error(String(e));
-  }
+/** Undo a batch, or the most recent un-undone batch when `batchId` is absent. */
+export function undoRename(batchId?: string): Promise<UndoResult> {
+  return invoke<UndoResult>('undo_rename', { batchId: batchId ?? null });
 }
 
-export async function getConfig(): Promise<Record<string, unknown>> {
-  try {
-    return await invoke<Record<string, unknown>>('get_config');
-  } catch (e) {
-    throw new Error(String(e));
-  }
+/** The persisted config, exactly as the backend sees it. */
+export function getConfig(): Promise<Record<string, unknown>> {
+  return invoke<Record<string, unknown>>('get_config');
 }
 
-export async function getConfigPath(): Promise<string | null> {
-  try {
-    return await invoke<string | null>('get_config_path');
-  } catch {
-    return null;
-  }
+/** Absolute path of the settings file. */
+export function getConfigPath(): Promise<string> {
+  return invoke<string>('get_config_path');
 }
 
-export async function getUndoLogDir(): Promise<string> {
-  const dir = await appDataDir();
-  return dir;
+/**
+ * Directory holding the undo log, resolved by the backend.
+ *
+ * This must not be derived from `appDataDir()` in the frontend: the backend
+ * honours portable mode and a custom `undo.log_path`, which `appDataDir()`
+ * knows nothing about.
+ */
+export function getUndoLogDir(): Promise<string> {
+  return invoke<string>('get_undo_log_path');
 }
 
-export async function validateConfig(): Promise<ConfigValidation> {
-  try {
-    return await invoke<ConfigValidation>('validate_config');
-  } catch (e) {
-    throw new Error(String(e));
-  }
+export function validateConfig(): Promise<ConfigValidation> {
+  return invoke<ConfigValidation>('validate_config');
 }
 
-export async function testApiConnection(
-  provider?: string,
-  apiKey?: string,
-  model?: string,
+export function testApiConnection(
+  provider: string,
+  apiKey: string,
+  model: string,
 ): Promise<TestConnectionResult> {
-  try {
-    return await invoke<TestConnectionResult>('test_connection', {
-      provider: provider || 'gemini',
-      apiKey: apiKey || '',
-      model: model || '',
-    });
-  } catch (e) {
-    return {
-      success: false,
-      message: String(e),
-      latency_ms: 0,
-      provider: provider || '',
-    };
-  }
+  return invoke<TestConnectionResult>('test_connection', { provider, apiKey, model });
 }
 
-export async function saveConfigBatch(
-  pairs: Array<{ key: string; value: string }>,
-): Promise<{ success: boolean; saved: number; failed: number; errors: string[]; saved_path?: string; error?: string }> {
-  try {
-    const result = await invoke<{ success: boolean; saved: number; failed: number; errors: string[]; saved_path?: string; error?: string }>('save_config_batch', {
-      pairs,
-    });
-    return result;
-  } catch (e) {
-    return {
-      success: false,
-      saved: 0,
-      failed: pairs.length,
-      errors: [String(e)],
-    };
-  }
+/**
+ * Persist a set of `section.field` updates.
+ *
+ * The backend applies them to the raw on-disk config, so `${ENV_VAR}`
+ * references survive a save instead of being replaced by their resolved
+ * values.
+ */
+export function saveConfigBatch(updates: ConfigUpdate[]): Promise<ConfigBatchResult> {
+  return invoke<ConfigBatchResult>('save_app_config_batch', { updates });
+}
+
+export function getVersion(): Promise<string> {
+  return invoke<string>('get_version');
+}
+
+export function isPortableApp(): Promise<boolean> {
+  return invoke<boolean>('is_portable_app');
+}
+
+/** Extensions the backend can extract from, without the leading dot. */
+export function getSupportedExtensions(): Promise<string[]> {
+  return invoke<string[]>('get_supported_extensions_list');
 }

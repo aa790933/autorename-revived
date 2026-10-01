@@ -2,6 +2,9 @@
 name = "autorename-revived-gui"
 version = "3.0.4"
 edition = "2021"
+description = "AI-powered batch document renamer (Tauri v2 desktop app)"
+license = "MIT"
+rust-version = "1.77"
 
 [lib]
 name = "autorename_revived_gui_lib"
@@ -12,7 +15,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-opener = "2"
@@ -20,15 +22,25 @@ tauri-plugin-store = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 base64 = "0.22"
-sha2 = "0.10"
-uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
-thiserror = "2"
+getrandom = "0.3"
 tracing = "0.1"
 zip = "2"
 lopdf = "0.34"
 encoding_rs = "0.8"
 mime_guess = "2"
+
+# Release tuning: the app is I/O-bound (network + file rename), so the goal is
+# a small, quick-to-load binary. Fat LTO + a single codegen unit removes
+# cross-crate dead weight and `strip` drops symbols from the shipped exe.
+# `panic = "abort"` is deliberately NOT set: the rename pipeline catches
+# per-file panics (see `lib.rs`) and surfaces them as a failed `FileResult`,
+# which is the behaviour a desktop user needs on a low-end machine.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true

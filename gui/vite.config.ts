@@ -21,6 +21,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    emptyOutDir: true,
     minify: 'esbuild',
     sourcemap: false,
     target: 'es2022',
@@ -33,7 +34,12 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@tauri-apps/api', '@tauri-apps/plugin-shell', '@tauri-apps/plugin-fs'],
+    include: [
+      '@tauri-apps/api',
+      '@tauri-apps/plugin-dialog',
+      '@tauri-apps/plugin-fs',
+      '@tauri-apps/plugin-opener',
+    ],
   },
   resolve: {
     extensions: ['.ts', '.mts', '.mjs', '.js', '.json'],

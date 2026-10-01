@@ -32,7 +32,17 @@ function switchView(appEl: HTMLElement, view: AppView): void {
       renderFilesView(appEl);
       break;
     case 'settings':
-      renderSettingsView(appEl);
+      // Loading the config is async; a failure here must not leave the view
+      // blank, so the rejection is surfaced instead of becoming an unhandled
+      // promise rejection.
+      renderSettingsView(appEl).catch((e) => {
+        console.error('Failed to render settings view', e);
+        appEl.innerHTML = `
+          <div class="flex flex-col items-center justify-center flex-1 gap-3 p-8">
+            <p class="text-[var(--text-secondary)]">Could not load settings.</p>
+            <p class="text-sm text-[var(--text-tertiary)]">${String(e)}</p>
+          </div>`;
+      });
       break;
     case 'about':
       renderAboutView(appEl);

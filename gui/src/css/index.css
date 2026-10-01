@@ -1,7 +1,10 @@
 /**
  * AutoRename-Revived GUI - Shared CSS Components
  *
- * Import this file as the Tailwind CSS input.
+ * Import this file as the Tailwind CSS input (see the `build:css` script).
+ * The compiled bundle is emitted to `tailwind.css` next to this file and is
+ * imported by `main.ts`, so the app ships a single Vite-processed stylesheet
+ * with no stale `assets/css/output.css` reference in `index.html`.
  *
  * Z-Index Hierarchy:
  *   100   - Titlebar/header
@@ -12,7 +15,7 @@
 
 @import "tailwindcss";
 
-/* Generated color palette (run `npm run colors` to generate) */
+/* Generated color palette (run `pnpm run colors` to generate) */
 @import './generated-colors.css';
 
 /* Source paths for Tailwind class detection */

@@ -1,9 +1,10 @@
 /**
  * Shared type definitions for the AutoRename-Revived frontend.
  *
- * These types mirror the Rust structs in `src-tauri/src/document.rs` and are
- * the single source of truth for frontend type definitions. Import from here
- * instead of duplicating in `sidecar.ts` or `config-store.ts`.
+ * These mirror the Rust structs in `src-tauri/src/document.rs` and
+ * `src-tauri/src/config.rs`, and are the single source of truth for frontend
+ * types. Import from here instead of re-declaring shapes in `sidecar.ts` or
+ * `config-store.ts`.
  */
 
 export interface FileResult {
@@ -30,23 +31,14 @@ export interface BatchResult {
   failed: number;
   files: FileResult[];
   dry_run: boolean;
-  batch_id?: string;
+  batch_id: string | null;
 }
-
-export interface ErrorResult {
-  success: false;
-  error_type: string;
-  message: string;
-  suggestion: string;
-}
-
-export type SidecarResult = BatchResult | ErrorResult;
 
 export interface UndoFileResult {
   old_path: string;
   new_path: string;
   status: 'restored' | 'failed';
-  error?: string;
+  error?: string | null;
 }
 
 export interface UndoResult {
@@ -54,5 +46,36 @@ export interface UndoResult {
   restored: number;
   failed: number;
   files: UndoFileResult[];
-  batch_id?: string;
+  batch_id: string | null;
+}
+
+export interface TestConnectionResult {
+  success: boolean;
+  message: string;
+  latency_ms: number;
+  provider: string;
+}
+
+export interface ConfigValidationIssue {
+  field: string;
+  level: 'error' | 'warning';
+  message: string;
+}
+
+export interface ConfigValidation {
+  valid: boolean;
+  issues: ConfigValidationIssue[];
+}
+
+export interface ConfigBatchResult {
+  success: boolean;
+  saved: number;
+  failed: number;
+  errors: string[];
+}
+
+/** A single `section.field` config write. */
+export interface ConfigUpdate {
+  key: string;
+  value: string;
 }

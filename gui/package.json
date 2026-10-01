@@ -6,13 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "build:css": "npx @tailwindcss/cli -i ./src/css/index.css -o ./assets/css/output.css --minify",
+    "build": "pnpm run colors && pnpm run build:css && tsc && vite build",
+    "build:css": "tailwindcss -i ./src/css/index.css -o ./src/css/tailwind.css --minify",
     "colors": "node scripts/generate-colors.js --config colors.json --output src/css/generated-colors.css --format css",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "tauri": "tauri",
     "icons": "node scripts/generate-app-icons.cjs --config icons.config.json"
@@ -21,12 +20,12 @@
     "@tauri-apps/api": "2.10.1",
     "@tauri-apps/plugin-dialog": "2.6.0",
     "@tauri-apps/plugin-fs": "2.4.5",
-    "@tauri-apps/plugin-opener": "2.5.4",
-    "@tauri-apps/plugin-shell": "2.3.5"
+    "@tauri-apps/plugin-opener": "2.5.4"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.11",
     "@tauri-apps/cli": "2.10.1",
+    "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^4.0.0",
     "culori": "^4.0.2",
     "jsdom": "^26.0.0",

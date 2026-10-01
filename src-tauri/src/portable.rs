@@ -22,22 +22,33 @@ fn portable_marker_path() -> Option<PathBuf> {
 ///
 /// - Portable: the directory containing the executable
 /// - Installer: the OS standard app_data_dir
-pub fn settings_dir(app: &tauri::AppHandle) -> PathBuf {
+///
+/// Returns an `Err` rather than panicking: this runs inside Tauri commands,
+/// where a panic surfaces as a crashed window instead of a usable message.
+/// If portable mode is active but the executable path is unavailable, the
+/// call falls back to the standard app-data directory.
+pub fn settings_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if is_portable() {
-        let exe = std::env::current_exe()
-            .expect("Failed to get current executable path");
-        exe.parent()
-            .expect("Failed to get executable parent directory")
-            .to_path_buf()
-    } else {
-        app.path()
-            .app_data_dir()
-            .expect("Failed to get app data dir")
-            .to_path_buf()
+        if let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+        {
+            return Ok(dir);
+        }
+        // Portable marker present but the exe path is unavailable; fall
+        // through to app data so the app still has a writable settings home.
     }
+    app.path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve the settings directory: {}", e))
 }
 
 /// Returns the full path to `settings.json` based on portability mode.
-pub fn settings_path(app: &tauri::AppHandle) -> PathBuf {
-    settings_dir(app).join("settings.json")
+pub fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(settings_dir(app)?.join("settings.json"))
+}
+
+/// Absolute path of the undo/rename history log inside the settings dir.
+pub fn undo_log_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(settings_dir(app)?.join("rename_history.json"))
 }

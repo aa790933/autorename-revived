@@ -6,16 +6,19 @@
   "build": {
     "frontendDist": "../gui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "cd ../gui && pnpm run colors && pnpm run build:css && pnpm run dev"
+    "beforeDevCommand": "pnpm --dir ../gui run colors && pnpm --dir ../gui run dev",
+    "beforeBuildCommand": "pnpm --dir ../gui run colors && pnpm --dir ../gui run build"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "AutoRename-Revived",
         "width": 900,
         "height": 600,
         "minWidth": 700,
         "minHeight": 450,
+        "resizable": true,
         "decorations": false,
         "center": true
       }
@@ -34,6 +37,11 @@
       "icons/icon.ico",
       "icons/icon.icns",
       "icons/icon.png"
-    ]
+    ],
+    "windows": {
+      "wix": {
+        "language": ["en-US"]
+      }
+    }
   }
 }

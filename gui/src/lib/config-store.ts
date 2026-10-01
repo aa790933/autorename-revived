@@ -1,3 +1,13 @@
+/**
+ * In-memory cache of the persisted configuration.
+ *
+ * Writes always go through `saveConfigBatch` in `sidecar.ts`, which applies
+ * `section.field` updates to the *raw* on-disk config so `${ENV_VAR}`
+ * references survive a save. There is intentionally no "write the whole
+ * object back" path: the config the frontend reads has its environment
+ * placeholders already resolved, and persisting that would store the secret
+ * in plaintext.
+ */
 import { invoke } from '@tauri-apps/api/core';
 
 export interface ConfigData {
@@ -6,11 +16,12 @@ export interface ConfigData {
     api_key: string;
     model: string;
     gemini_model: string;
-    gemini_api_key: string;
+    base_url: string;
     gemini_base_url: string;
     custom_model: string;
     custom_base_url: string;
-     temperature: number;
+    ollama_base_url: string;
+    temperature: number;
     timeout: number;
     system_prompt: string;
   };
@@ -39,27 +50,26 @@ export interface ConfigData {
   harmonized_companies: unknown[];
 }
 
+/**
+ * Mirrors `AppConfig::default()` in `src-tauri/src/config.rs`.
+ *
+ * Only used when the backend is unreachable or the settings file is missing;
+ * the backend remains the source of truth for every default.
+ */
 const DEFAULT_CONFIG: ConfigData = {
   ai: {
     provider: 'gemini',
     api_key: '',
     model: 'gpt-4o-mini',
-    gemini_model: 'gemini-3.5-flash-lite',
-    gemini_api_key: '',
+    gemini_model: 'gemini-2.0-flash',
+    base_url: '',
     gemini_base_url: '',
     custom_model: '',
     custom_base_url: '',
-     temperature: 0.0,
+    ollama_base_url: '',
+    temperature: 0,
     timeout: 30,
-    system_prompt: `Analyze this document thoroughly. Extract the following metadata fields as JSON:
-
-- date_YYYY_MM_DD: Primary issuance/effective date in YYYY-MM-DD format. If no date exists, use empty string.
-- issuer_entity_short: Short functional entity name (strip legal suffixes like 'LLC', 'Inc.'). If no issuer, use empty string.
-- document_nature: Administrative/structural type (e.g., Invoice, Contract, ID_Card, Photo, Receipt, Letter, Report).
-- specific_subject: 2-4 word description of the UNIQUE topic. Must NOT repeat words from document_nature or issuer_entity_short.
-- is_unreadable_or_error: Set to true if the document cannot be read or understood.
-
-Do NOT output anything except the JSON object. If you CANNOT read the document, set is_unreadable_or_error to true and provide best-effort values for the other fields.`,
+    system_prompt: '',
   },
   document: {
     vision: 'auto',
@@ -78,13 +88,46 @@ Do NOT output anything except the JSON object. If you CANNOT read the document, 
   },
   undo: {
     enabled: true,
-    log_path: '~/.autorename-revived/rename_history.json',
+    log_path: '',
     max_entries: 100,
   },
   debug: false,
   max_workers: 4,
   harmonized_companies: [],
 };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Deep-merge a loaded config over the defaults.
+ *
+ * A shallow spread left whole sections undefined whenever the persisted file
+ * predates a section (or a single key), which made the settings form render
+ * `undefined`.
+ */
+function mergeConfig(base: ConfigData, loaded: unknown): ConfigData {
+  if (!isPlainObject(loaded)) return structuredClone(base);
+
+  const merge = (target: Record<string, unknown>, source: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(source)) {
+      if (value === undefined) continue;
+      const current = target[key];
+      if (isPlainObject(value) && isPlainObject(current)) {
+        merge(current, value);
+      } else {
+        target[key] = value;
+      }
+    }
+    return target;
+  };
+
+  return merge(
+    structuredClone(base) as unknown as Record<string, unknown>,
+    loaded,
+  ) as unknown as ConfigData;
+}
 
 let _config: ConfigData = structuredClone(DEFAULT_CONFIG);
 let _loaded = false;
@@ -93,8 +136,8 @@ export async function loadConfig(): Promise<ConfigData> {
   if (_loaded) return _config;
 
   try {
-    const loaded = await invoke<ConfigData>('load_app_config');
-    _config = { ...structuredClone(DEFAULT_CONFIG), ...loaded };
+    const loaded = await invoke<unknown>('load_app_config');
+    _config = mergeConfig(DEFAULT_CONFIG, loaded);
   } catch {
     _config = structuredClone(DEFAULT_CONFIG);
   }
@@ -108,26 +151,10 @@ export function getConfigSync(): ConfigData {
 }
 
 /**
- * Force re-read config from disk. Useful when the config file may have been
- * modified externally (e.g. portable mode settings change).
+ * Force a re-read from disk. Used after a save so the form reflects exactly
+ * what was persisted.
  */
 export async function reloadConfig(): Promise<ConfigData> {
   _loaded = false;
   return loadConfig();
-}
-
-export async function saveConfig(config: ConfigData): Promise<void> {
-  _config = structuredClone(config);
-  _loaded = true;
-
-  try {
-    await invoke('save_app_config', { config: _config });
-  } catch (e) {
-    console.warn('Failed to persist config via Rust backend:', e);
-  }
-}
-
-export function resetConfig(): void {
-  _config = structuredClone(DEFAULT_CONFIG);
-  _loaded = true;
 }

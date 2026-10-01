@@ -1,25 +1,23 @@
 import { getState, subscribe, addFiles, clearFiles, setState, updateFileStatuses } from '../lib/state';
 import { setupDragDrop } from '../lib/dnd';
 import { pickFiles, pickFolder } from '../lib/filepicker';
-import { renameFiles, undoRename, cancelRename, isErrorResult, getUndoLogDir } from '../lib/sidecar';
-import { applyCachedRenames } from '../lib/rename-cache';
+import { renameFiles, undoRename, cancelRename } from '../lib/sidecar';
 import { getConfigSync } from '../lib/config-store';
 import { showToast } from '../lib/toast';
 import { escapeHtml } from '../lib/utils';
 import type { AppState, FileEntry } from '../lib/state';
-import type { BatchResult, SidecarResult } from '../lib/types';
 
 let container: HTMLElement;
 let cleanupDnd: (() => void) | undefined;
 let unsubscribe: (() => void) | undefined;
 
 // Module-level flag: tracks whether the current rename operation has been
-// cancelled by the user.  This prevents a stale `renameFiles` promise from
+// cancelled by the user. This prevents a stale `renameFiles` promise from
 // overwriting the cancelled state set in `handleCancel`.
 let cancelRequested = false;
 
-// Guard against double-click: when a rename operation is in-flight, ignore
-// subsequent clicks until it completes or is cancelled.
+// Guard against double-click: while a rename is in flight, further clicks are
+// ignored until the backend call settles.
 let renameInFlight = false;
 
 export function renderFilesView(root: HTMLElement): void {
@@ -263,241 +261,134 @@ function selectSuggestion(filePath: string, newName: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Rename (with dry-run cache support)
+// Rename
 // ---------------------------------------------------------------------------
 
+/**
+ * Run the rename pipeline.
+ *
+ * `dryRun` asks the backend for the proposed names without touching disk; the
+ * preview is stored on the file entries so the list can show them. A real run
+ * always goes through the backend again rather than replaying a cached
+ * preview, so the undo log, collision handling and vision fallbacks behave
+ * exactly like a first run.
+ */
 async function runRename(dryRun: boolean): Promise<void> {
-  // Guard against double-click: if a rename is already in-flight, ignore
-  // subsequent calls until the current one completes or is cancelled.
   if (renameInFlight) return;
-  renameInFlight = true;
 
-  // Reset cancellation flag at the start of every new operation
+  // Reset cancellation flag at the start of every new operation.
   cancelRequested = false;
 
-  // Fresh read — do NOT rely on a stale closure-captured `state`
   const state = getState();
+  const targets = state.files.filter(
+    (f) => f.status === 'pending' || f.status === 'skipped',
+  );
+  const paths = targets.map((f) => f.path);
 
-  // Cache path: apply dry-run results directly without re-processing
-  if (!dryRun && state.dryRunResult) {
-    const filesToRename = state.files.filter((f) => f.status === 'pending' || f.status === 'skipped');
-    if (filesToRename.length === 0) {
-      showToast('No files to process', 'warning');
-      renameInFlight = false;
-      return;
-    }
+  if (paths.length === 0) {
+    showToast('No files to process', 'warning');
+    return;
+  }
 
-    // Mark pending/skipped files as processing so the UI shows activity
-    const currentCache = getState();
-    setState({
-      processing: true,
-      progress: 'Applying cached results\u2026',
-      statusError: '',
-      files: currentCache.files.map((f) =>
-        f.status === 'pending' || f.status === 'skipped'
-          ? { ...f, status: 'processing' as const }
-          : f,
-      ),
+  renameInFlight = true;
+
+  // Mark only the pending/skipped files as 'processing', preserving
+  // already-completed or failed entries instead of dropping them.
+  const processing = new Set(paths);
+  setState({
+    processing: true,
+    progress: dryRun ? 'Previewing\u2026' : 'Starting\u2026',
+    statusError: '',
+    files: state.files.map((f) =>
+      processing.has(f.path) ? { ...f, status: 'processing' as const } : f,
+    ),
+  });
+
+  try {
+    const batch = await renameFiles(paths, {
+      dryRun,
+      provider: getConfigSync().ai.provider,
     });
 
-    try {
-      const undoLogDir = await getUndoLogDir();
-      const batch = await applyCachedRenames(filesToRename, undoLogDir, (msg) => {
-        setState({ progress: msg });
-      });
+    // The user cancelled while the request was in flight: `handleCancel`
+    // already reset the UI state, so discard the result rather than
+    // overwriting it.
+    if (cancelRequested) return;
 
-      // Batch all state updates into a single call to prevent triple re-render
-      const updatedFiles = getState().files.map((f) => {
-        if (f.status !== 'processing') return f;
-        const result = batch.files.find((r) => r.file === f.path);
-        if (result) {
-          return {
-            ...f,
-            status: result.status as FileEntry['status'],
-            result,
-          };
-        }
-        // Files in processing that did not receive a result are marked as failed
-        return { ...f, status: 'failed' as const };
-      });
+    updateFileStatuses(batch, dryRun);
 
+    if (dryRun) {
+      setState({ dryRunResult: batch });
+      if (batch.completed === 0 && batch.skipped > 0) {
+        showToast('Preview: all files already correctly named', 'info');
+      } else {
+        showToast(`Preview: ${batch.completed} to process, ${batch.skipped} to skip`, 'info');
+      }
+    } else {
+      // Undo is only possible when something was actually renamed.
       setState({
-        processing: false,
-        progress: '',
-        statusError: '',
-        files: updatedFiles,
         lastResult: batch,
-        dryRunResult: null,
-        lastBatchId: batch.batch_id ?? null,
+        lastBatchId: batch.completed > 0 ? batch.batch_id : null,
       });
 
       if (batch.failed > 0) {
         showToast(`${batch.completed} completed, ${batch.failed} failed`, 'warning');
+      } else if (batch.completed === 0 && batch.skipped > 0) {
+        showToast('All files already correctly named', 'info');
       } else {
         showToast(`${batch.completed} files renamed successfully`, 'success');
       }
-    } catch (err) {
-      // CRITICAL: Mark ALL processing files as failed so they don't get stuck
-      const stuckFiles = getState().files.map((f) =>
-        f.status === 'processing'
-          ? { ...f, status: 'failed' as const, result: undefined }
-          : f,
-      );
-      setState({ processing: false, progress: '', files: stuckFiles });
-      showToast(`Rename failed: ${err}`, 'danger');
-    } finally {
-      renameInFlight = false;
+
+      // Surface per-file warnings (extraction failures, truncation, …) but cap
+      // the number of toasts: a 500-file batch would otherwise bury the UI.
+      const unique = [...new Set(batch.files.flatMap((f) => f.warnings ?? []))];
+      const MAX_WARNING_TOASTS = 5;
+      for (const w of unique.slice(0, MAX_WARNING_TOASTS)) {
+        showToast(w, 'warning');
+      }
+      if (unique.length > MAX_WARNING_TOASTS) {
+        showToast(`…and ${unique.length - MAX_WARNING_TOASTS} more warnings`, 'warning');
+      }
     }
-    return;
-  }
 
-  // Standard path: call CLI sidecar
-  const paths = state.files.filter((f) => f.status === 'pending' || f.status === 'skipped').map((f) => f.path);
-
-  if (paths.length === 0) {
-    showToast('No files to process', 'warning');
-    renameInFlight = false;
-    return;
-  }
-
-  // Mark only the pending/skipped files as 'processing', preserving
-  // already-completed or failed entries instead of dropping them.
-  const current = getState();
-  setState({
-    processing: true,
-    progress: 'Starting...',
-    statusError: '',
-    files: current.files.map((f) =>
-      f.status === 'pending' || f.status === 'skipped'
-        ? { ...f, status: 'processing' as const }
-        : f,
-    ),
-  });
-
-  let result: SidecarResult;
-  try {
-    result = await renameFiles(
-      paths,
-      { dryRun, provider: getConfigSync().ai.provider },
-    );
+    setState({ processing: false, progress: '', statusError: '' });
   } catch (err) {
-    // If the user cancelled, swallow the error — state was already reset
-    if (cancelRequested) {
-      return;
-    }
-    const errStr = String(err);
-    const lowerErr = errStr.toLowerCase();
-    if (lowerErr.includes('sidecar') || lowerErr.includes('not found') || lowerErr.includes('binaries')
-        || lowerErr.includes('os error') || lowerErr.includes('cannot find')
-        || lowerErr.includes('introuvable') || lowerErr.includes('no such file')) {
-      setState({ processing: false, progress: '', statusError: 'CLI executable not found' });
-      showToast('CLI executable not found. Re-extract the portable ZIP, or run "python build.py --cli-only --nosign" if developing.', 'danger');
-    } else {
-      setState({ processing: false, progress: '' });
-      showToast(`Error: ${errStr}`, 'danger');
-    }
-    // Mark all pending/processing/skipped files as failed so they don't stay stuck
-    const currentAfter = getState();
-    const updated = currentAfter.files.map((f) => (f.status === 'pending' || f.status === 'skipped' || f.status === 'processing')
-      ? { ...f, status: 'failed' as const }
-      : f);
-    setState({ files: updated });
-    renameInFlight = false;
-    return;
-  }
-
-  // If the user cancelled while the async operation was in-flight,
-  // discard the result — the UI state was already updated by handleCancel.
-  if (cancelRequested) {
-    return;
-  }
-
-  if (isErrorResult(result)) {
-    let msg = result.message;
-    let statusMsg = '';
-    if (result.error_type === 'sidecar_error') {
-      msg = 'CLI executable not found. Re-extract the portable ZIP, or run "python build.py --cli-only --nosign" if developing.';
-      statusMsg = 'CLI executable not found';
-    } else if (result.error_type === 'config_error') {
-      msg = 'config.yaml missing or invalid — copy config.yaml.example and add your API key';
-      statusMsg = 'Config error';
-    } else if (result.error_type === 'auth_error') {
-      msg = 'API key missing or invalid — set ai.api_key in config.yaml';
-      statusMsg = 'Auth error';
-    }
-    if (result.suggestion) msg += `. ${result.suggestion}`;
-    if (statusMsg) setState({ statusError: statusMsg });
-    showToast(msg, 'danger');
-    // CRITICAL: Mark all stuck 'processing' files as 'failed' so they
-    // don't remain permanently in the processing state.
-    const currentError = getState();
+    if (cancelRequested) return;
+    // Any file left in `processing` must not stay there forever.
+    const message = String(err);
+    const stuck = getState().files.map((f) =>
+      f.status === 'processing' ? { ...f, status: 'failed' as const, result: undefined } : f,
+    );
     setState({
       processing: false,
       progress: '',
-      files: currentError.files.map((f) =>
-        f.status === 'processing'
-          ? { ...f, status: 'failed' as const, result: undefined }
-          : f,
-      ),
+      files: stuck,
+      statusError: message,
     });
+    showToast(`Rename failed: ${message}`, 'danger');
+  } finally {
     renameInFlight = false;
-    return;
   }
-
-  const batch = result as BatchResult;
-  updateFileStatuses(batch, dryRun);
-
-  if (dryRun) {
-    setState({ dryRunResult: batch });
-    if (batch.completed === 0 && batch.skipped > 0) {
-      showToast('Preview: all files already correctly named', 'info');
-    } else {
-      showToast(`Preview: ${batch.completed} to process, ${batch.skipped} to skip`, 'info');
-    }
-  } else {
-    // Only enable undo when files were actually renamed
-    if (batch.completed > 0) {
-      setState({ lastResult: batch, lastBatchId: batch.batch_id ?? null });
-    } else {
-      setState({ lastResult: batch, lastBatchId: null });
-    }
-    if (batch.failed > 0) {
-      showToast(`${batch.completed} completed, ${batch.failed} failed`, 'warning');
-    } else if (batch.completed === 0 && batch.skipped > 0) {
-      showToast('All files already correctly named', 'info');
-    } else {
-      showToast(`${batch.completed} files renamed successfully`, 'success');
-    }
-    // Surface per-file warnings (e.g. extraction failures)
-    const allWarnings = batch.files.flatMap((f) => f.warnings ?? []);
-    const unique = [...new Set(allWarnings)];
-    for (const w of unique) {
-      showToast(w, 'warning');
-    }
-  }
-
-  setState({ processing: false, progress: '', statusError: '' });
-  renameInFlight = false;
 }
 
 async function handleCancel(): Promise<void> {
   cancelRequested = true;
-  renameInFlight = false;
   try {
     await cancelRename();
   } catch {
-    // Ignore backend call failure — the flag is set locally
+    // The backend flag is best-effort; the local flag already stops the UI
+    // from applying a stale result.
   }
-  // Batch all state updates into a single call
+  // `renameInFlight` deliberately stays true: the backend call is still
+  // running, and letting a new batch start now would race the cancellation
+  // and mix two batches in the undo log.
   const currentState = getState();
   setState({
     processing: false,
     progress: '',
     statusError: '',
     files: currentState.files.map((f) =>
-      f.status === 'processing'
-        ? { ...f, status: 'failed' as const }
-        : f,
+      f.status === 'processing' ? { ...f, status: 'failed' as const } : f,
     ),
   });
   showToast('Rename operation cancelled', 'info');
@@ -509,26 +400,27 @@ async function handleUndo(): Promise<void> {
     showToast('Nothing to undo', 'info');
     return;
   }
-  setState({ processing: true, progress: 'Undoing...' });
+  if (renameInFlight) return;
+
+  renameInFlight = true;
+  setState({ processing: true, progress: 'Undoing\u2026' });
 
   try {
-    const result = await undoRename(lastBatchId ?? undefined);
+    const result = await undoRename(lastBatchId);
+    setState({ processing: false, progress: '' });
 
-    if ('error_type' in result) {
-      setState({ processing: false, progress: '' });
-      let msg = result.message;
-      if (result.suggestion) msg += `. ${result.suggestion}`;
-      showToast(msg, 'danger');
-    } else if (result.success) {
-      setState({ processing: false, progress: '' });
+    if (result.success) {
       showToast(`${result.restored} files restored`, 'success');
       clearFiles();
-    } else {
-      setState({ processing: false, progress: '' });
+    } else if (result.failed > 0) {
       showToast(`Undo: ${result.restored} restored, ${result.failed} failed`, 'warning');
+    } else {
+      showToast('Nothing to undo', 'info');
     }
   } catch (err) {
     setState({ processing: false, progress: '' });
     showToast(`Undo failed: ${err}`, 'danger');
+  } finally {
+    renameInFlight = false;
   }
 }

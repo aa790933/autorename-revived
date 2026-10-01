@@ -1,22 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock Tauri IPC invoke
+// Mock Tauri IPC invoke. The mock must be declared before the module under
+// test is imported, so each test imports `./sidecar` dynamically.
 const invokeSpy = vi.fn();
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => invokeSpy(...args),
 }));
 
-vi.mock('@tauri-apps/api/path', () => ({
-  appDataDir: vi.fn(async () => 'D:\\appdata'),
-}));
-
+/**
+ * These tests pin the *contract* between the frontend wrappers and the Rust
+ * commands: the command name, and the argument keys Tauri will map onto the
+ * snake_case Rust parameters. A mismatch here is a silent runtime failure —
+ * exactly the class of bug this suite exists to catch.
+ */
 describe('sidecar IPC wrappers', () => {
   beforeEach(() => {
     invokeSpy.mockReset();
+    vi.resetModules();
   });
 
-  it('renameFiles calls invoke with correct arguments', async () => {
+  it('renameFiles passes paths and options under the keys the backend expects', async () => {
     invokeSpy.mockResolvedValue({
       success: true,
       total: 2,
@@ -25,13 +29,14 @@ describe('sidecar IPC wrappers', () => {
       failed: 0,
       files: [],
       dry_run: false,
+      batch_id: 'gui-1',
     });
 
     const { renameFiles } = await import('./sidecar');
-    const result = await renameFiles(
-      ['file1.pdf', 'file2.docx'],
-      { dryRun: true, provider: 'gemini' },
-    );
+    const result = await renameFiles(['file1.pdf', 'file2.docx'], {
+      dryRun: true,
+      provider: 'gemini',
+    });
 
     expect(invokeSpy).toHaveBeenCalledWith('rename_files', {
       paths: ['file1.pdf', 'file2.docx'],
@@ -40,44 +45,57 @@ describe('sidecar IPC wrappers', () => {
     expect(result.success).toBe(true);
   });
 
-  it('renameFiles returns ErrorResult on invoke failure', async () => {
+  it('renameFiles propagates a backend rejection instead of swallowing it', async () => {
     invokeSpy.mockRejectedValue(new Error('IPC failed'));
-
-    const { renameFiles, isErrorResult } = await import('./sidecar');
-    const result = await renameFiles(['file.pdf']);
-
-    expect(isErrorResult(result)).toBe(true);
-    if ('error_type' in result) {
-      expect(result.error_type).toBe('sidecar_error');
-    }
+    const { renameFiles } = await import('./sidecar');
+    await expect(renameFiles(['file.pdf'])).rejects.toThrow('IPC failed');
   });
 
-  it('cancelRename invokes cancel_rename command', async () => {
+  it('cancelRename invokes cancel_rename with no arguments', async () => {
     invokeSpy.mockResolvedValue(true);
-
     const { cancelRename } = await import('./sidecar');
-    const result = await cancelRename();
 
+    await expect(cancelRename()).resolves.toBe(true);
     expect(invokeSpy).toHaveBeenCalledWith('cancel_rename');
-    expect(result).toBe(true);
   });
 
-  it('getUndoLogDir returns appDataDir', async () => {
+  it('undoRename sends batchId as null when no batch is given', async () => {
+    invokeSpy.mockResolvedValue({
+      success: true,
+      restored: 0,
+      failed: 0,
+      files: [],
+      batch_id: null,
+    });
+    const { undoRename } = await import('./sidecar');
+
+    await undoRename();
+    expect(invokeSpy).toHaveBeenCalledWith('undo_rename', { batchId: null });
+
+    invokeSpy.mockClear();
+    await undoRename('gui-20240101T000000');
+    expect(invokeSpy).toHaveBeenCalledWith('undo_rename', {
+      batchId: 'gui-20240101T000000',
+    });
+  });
+
+  it('getUndoLogDir asks the backend rather than guessing appDataDir', async () => {
+    invokeSpy.mockResolvedValue('D:\\portable');
     const { getUndoLogDir } = await import('./sidecar');
-    const dir = await getUndoLogDir();
 
-    expect(dir).toBe('D:\\appdata');
+    await expect(getUndoLogDir()).resolves.toBe('D:\\portable');
+    expect(invokeSpy).toHaveBeenCalledWith('get_undo_log_path');
   });
 
-  it('testApiConnection passes provider, apiKey, model to invoke', async () => {
+  it('testApiConnection maps provider/apiKey/model onto the Rust parameters', async () => {
     invokeSpy.mockResolvedValue({
       success: true,
       message: 'Connected',
       latency_ms: 100,
       provider: 'openai',
     });
-
     const { testApiConnection } = await import('./sidecar');
+
     const result = await testApiConnection('openai', 'sk-test-key', 'gpt-4o');
 
     expect(invokeSpy).toHaveBeenCalledWith('test_connection', {
@@ -89,22 +107,25 @@ describe('sidecar IPC wrappers', () => {
     expect(result.provider).toBe('openai');
   });
 
-  it('testApiConnection returns error result on failure', async () => {
-    invokeSpy.mockRejectedValue(new Error('Connection refused'));
+  it('saveConfigBatch sends the updates array under the "updates" key', async () => {
+    invokeSpy.mockResolvedValue({ success: true, saved: 1, failed: 0, errors: [] });
+    const { saveConfigBatch } = await import('./sidecar');
 
-    const { testApiConnection } = await import('./sidecar');
-    const result = await testApiConnection('openai', 'sk-key', 'gpt-4o');
+    const result = await saveConfigBatch([{ key: 'ai.provider', value: 'ollama' }]);
 
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('Connection refused');
+    // The Rust command takes `updates: Vec<ConfigUpdate>`; sending `pairs`
+    // would make every settings save fail with a deserialization error.
+    expect(invokeSpy).toHaveBeenCalledWith('save_app_config_batch', {
+      updates: [{ key: 'ai.provider', value: 'ollama' }],
+    });
+    expect(result.saved).toBe(1);
   });
 
-  it('isErrorResult correctly identifies ErrorResult', async () => {
-    const { isErrorResult } = await import('./sidecar');
-    const errorResult = { success: false as const, error_type: 'auth_error', message: 'bad key', suggestion: '' };
-    const batchResult = { success: true as const, total: 1, completed: 1, skipped: 0, failed: 0, files: [], dry_run: false };
+  it('getSupportedExtensions reads the backend list', async () => {
+    invokeSpy.mockResolvedValue(['pdf', 'docx']);
+    const { getSupportedExtensions } = await import('./sidecar');
 
-    expect(isErrorResult(errorResult)).toBe(true);
-    expect(isErrorResult(batchResult as never)).toBe(false);
+    await expect(getSupportedExtensions()).resolves.toEqual(['pdf', 'docx']);
+    expect(invokeSpy).toHaveBeenCalledWith('get_supported_extensions_list');
   });
 });
