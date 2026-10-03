@@ -77,13 +77,9 @@ jobs:
           pnpm run colors
           pnpm run build:css
           pnpm run build
-      - name: Install Tauri CLI
-        shell: pwsh
-        run: cargo install tauri-cli --version "^2" --locked
       - name: Build Tauri GUI (portable)
         shell: pwsh
-        working-directory: src-tauri
-        run: cargo tauri build --target x86_64-pc-windows-msvc
+        run: pnpm --dir gui tauri build --target x86_64-pc-windows-msvc
       - name: Verify GUI EXE
         shell: pwsh
         run: |
@@ -171,13 +167,9 @@ jobs:
           pnpm run colors
           pnpm run build:css
           pnpm run build
-      - name: Install Tauri CLI
-        shell: pwsh
-        run: cargo install tauri-cli --version "^2" --locked
       - name: Build Tauri MSI
         shell: pwsh
-        working-directory: src-tauri
-        run: cargo tauri build --target x86_64-pc-windows-msvc --bundles msi
+        run: pnpm --dir gui tauri build --target x86_64-pc-windows-msvc --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:

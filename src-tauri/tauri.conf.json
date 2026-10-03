@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../gui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm --dir ../gui run colors && pnpm --dir ../gui run dev",
-    "beforeBuildCommand": "pnpm --dir ../gui run colors && pnpm --dir ../gui run build"
+    "beforeDevCommand": "node -e \"const fs=require('fs'), {execSync}=require('child_process'); const dir=fs.existsSync('gui')?'gui':fs.existsSync('../gui')?'../gui':'.'; execSync('pnpm --dir ' + dir + ' run colors && pnpm --dir ' + dir + ' run dev', {stdio:'inherit'});\"",
+    "beforeBuildCommand": "node -e \"const fs=require('fs'), {execSync}=require('child_process'); const dir=fs.existsSync('gui')?'gui':fs.existsSync('../gui')?'../gui':'.'; execSync('pnpm --dir ' + dir + ' run colors && pnpm --dir ' + dir + ' run build', {stdio:'inherit'});\""
   },
   "app": {
     "windows": [
