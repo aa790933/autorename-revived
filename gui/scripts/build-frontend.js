@@ -9,11 +9,9 @@ const __dirname = path.dirname(__filename);
  * Absolute path to the `gui` directory.
  *
  * This script is invoked by Tauri as `beforeBuildCommand`/`beforeDevCommand`.
- * In Tauri v2 the command runs from the directory containing
- * `tauri.conf.json` (`src-tauri`), so `../gui` points at the frontend.
- * We resolve the path relative to *this* file rather than `process.cwd()`
- * so the build is robust no matter where the Tauri CLI happens to be
- * launched from (src-tauri, the workspace root, or CI).
+ * In Tauri v2 the command runs from the project root (workspace root),
+ * so `gui/scripts/build-frontend.js` is the entry point.
+ * We resolve the path relative to *this* file (which is in `gui/scripts`).
  */
 const guiDir = path.resolve(__dirname, '..');
 
