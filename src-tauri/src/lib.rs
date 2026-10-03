@@ -15,6 +15,7 @@ use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::JoinSet;
+use futures::FutureExt;
 
 static CANCEL_RENAME: AtomicBool = AtomicBool::new(false);
 
@@ -597,12 +598,14 @@ impl Pipeline {
             self.naming.max_length as usize,
         ) {
             Ok(p) => p,
-            Err(e) => FileResult {
-                status: "failed".to_string(),
-                new_name: Some(final_name),
-                error: Some(e),
-                ..base
-            },
+            Err(e) => {
+                return FileResult {
+                    status: "failed".to_string(),
+                    new_name: Some(final_name),
+                    error: Some(e),
+                    ..base
+                };
+            }
         };
 
         let src_name = std::path::Path::new(&path)
