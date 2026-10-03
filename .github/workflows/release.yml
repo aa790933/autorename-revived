@@ -79,7 +79,8 @@ jobs:
           pnpm run build
       - name: Build Tauri GUI (portable)
         shell: pwsh
-        run: pnpm --dir gui tauri build --target x86_64-pc-windows-msvc --config ../src-tauri/tauri.conf.json
+        working-directory: src-tauri
+        run: node "../gui/node_modules/@tauri-apps/cli/tauri.js" build --target x86_64-pc-windows-msvc
       - name: Verify GUI EXE
         shell: pwsh
         run: |
@@ -169,7 +170,8 @@ jobs:
           pnpm run build
       - name: Build Tauri MSI
         shell: pwsh
-        run: pnpm --dir gui tauri build --target x86_64-pc-windows-msvc --bundles msi --config ../src-tauri/tauri.conf.json
+        working-directory: src-tauri
+        run: node "../gui/node_modules/@tauri-apps/cli/tauri.js" build --target x86_64-pc-windows-msvc --bundles msi
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
