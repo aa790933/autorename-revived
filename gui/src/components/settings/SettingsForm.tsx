@@ -138,8 +138,8 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
     if (!original) return updates;
 
     const checkNestedField = (section: NestedSection, key: string) => {
-      const originalSection = original[section] as Record<string, unknown>;
-      const localSection = localConfig[section] as Record<string, unknown>;
+      const originalSection = original[section] as unknown as Record<string, unknown>;
+      const localSection = localConfig[section] as unknown as Record<string, unknown>;
       const originalVal = originalSection[key];
       const localVal = localSection[key];
       if (originalVal !== localVal) {
