@@ -10,7 +10,6 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 export function Header() {
   const { t } = useTranslation();
   const { sidebarOpen, toggleSidebar, theme, setTheme, view } = useAppStore();
-  const isRTL = document.documentElement.dir === 'rtl';
 
   const handleMinimize = async () => {
     const window = getCurrentWindow();

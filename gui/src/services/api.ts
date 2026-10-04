@@ -137,6 +137,13 @@ export async function loadAppConfig(): Promise<AppConfig> {
 }
 
 /**
+ * Reload config from backend (force re-read)
+ */
+export async function reloadConfig(): Promise<AppConfig> {
+  return invoke<AppConfig>('load_app_config');
+}
+
+/**
  * Save app config (full config)
  */
 export async function saveAppConfig(config: AppConfig): Promise<void> {

@@ -1,8 +1,7 @@
 /**
  * Base UI Components - Toggle, Checkbox, Radio
  */
-import { forwardRef, InputHTMLAttributes, LabelHTMLAttributes } from 'react';
-import { clsx } from 'clsx';
+import { forwardRef, InputHTMLAttributes, HTMLAttributes } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 // Toggle / Switch

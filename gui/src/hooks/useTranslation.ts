@@ -27,7 +27,7 @@ export const t = i18n.t.bind(i18n);
 /**
  * Change language programmatically
  */
-export function changeLanguage(lng: string): Promise<void> {
+export function changeLanguage(lng: string): Promise<unknown> {
   return i18n.changeLanguage(lng);
 }
 

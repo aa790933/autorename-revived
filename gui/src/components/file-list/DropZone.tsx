@@ -2,12 +2,9 @@
  * File List Components - Drop Zone
  */
 import { useTranslation } from 'react-i18next';
-import { FileText, Upload, FolderOpen, Plus } from 'lucide-react';
+import { FileText, Upload, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui';
-import { useDragDrop } from '@/hooks/useDragDrop';
 import { pickFiles, pickFolder } from '@/services/filepicker';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
 interface DropZoneProps {
   onBrowseFiles: () => void;
@@ -17,7 +14,6 @@ interface DropZoneProps {
 
 export function DropZone({ onBrowseFiles, onBrowseFolder, dragActive }: DropZoneProps) {
   const { t } = useTranslation();
-  const { cleanup } = useDragDrop({ onHover: () => {} }); // Handled by parent
 
   return (
     <div

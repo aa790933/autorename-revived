@@ -9,14 +9,13 @@ import { SettingsForm } from '@/components/settings';
 import { HistoryView } from '@/components/views';
 import { AboutView } from '@/components/views';
 import { useAppStore } from '@/store';
-import { loadAppConfig, validateConfig, reloadConfig } from '@/services/api';
+import { loadAppConfig, validateConfig } from '@/services/api';
 import { showToast } from '@/hooks/useToast';
 import { t } from '@/hooks/useTranslation';
 import { getLanguageDirection } from '@/i18n';
 
 function ViewContent() {
   const { view } = useAppStore();
-  const { t } = useTranslation();
 
   switch (view) {
     case 'files':
@@ -38,7 +37,7 @@ function ViewContent() {
 
 export function App() {
   const { i18n } = useTranslation();
-  const { setConfig, config, language, setLanguage } = useAppStore();
+  const { setConfig, setLanguage } = useAppStore();
 
   // Initialize app on mount
   useEffect(() => {

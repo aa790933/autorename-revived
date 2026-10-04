@@ -2,12 +2,76 @@
  * Views - History View
  */
 import { useTranslation } from 'react-i18next';
-import { Clock, RotateCcw, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button, Card, Badge } from '@/components/ui';
 import { useAppStore } from '@/store';
-import { formatBytes } from '@/utils/helpers';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+
+const STATUS_COLORS = {
+  completed: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+  skipped: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
+  failed: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+} as const;
+
+const STAT_CARD_COLORS = {
+  blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+  green: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+  yellow: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400',
+  red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
+} as const;
+
+interface StatCardProps {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  color?: keyof typeof STAT_CARD_COLORS;
+}
+
+function StatCard({ label, value, icon, color = 'blue' }: StatCardProps) {
+  return (
+    <div className={`p-4 rounded-xl text-center ${STAT_CARD_COLORS[color]}`}>
+      <div className="flex items-center justify-center mb-2">
+        {icon}
+      </div>
+      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-sm">{label}</p>
+    </div>
+  );
+}
+
+interface FileHistoryRowProps {
+  file: {
+    file: string;
+    new_name?: string | null;
+    status: string;
+  };
+  index: number;
+}
+
+function FileHistoryRow({ file, index }: FileHistoryRowProps) {
+  const statusIcons = {
+    completed: CheckCircle,
+    skipped: XCircle,
+    failed: AlertCircle,
+  } as const;
+
+  const Icon = statusIcons[file.status as keyof typeof statusIcons] || FileText;
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+      <span className="text-sm text-gray-500 dark:text-gray-400 w-6 text-right">{index + 1}.</span>
+      <span className="flex-1 truncate font-mono text-sm">{file.file.split(/[\\/]/).pop()}</span>
+      {file.new_name && (
+        <span className="flex-1 truncate font-mono text-sm text-blue-600 dark:text-blue-400">
+          → {file.new_name}
+        </span>
+      )}
+      <Badge variant={file.status as any} size="sm">
+        {file.status}
+      </Badge>
+    </div>
+  );
+}
 
 export function HistoryView() {
   const { t } = useTranslation();
@@ -95,64 +159,6 @@ export function HistoryView() {
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-import { useState } from 'react';
-import { FileText, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
-
-function StatCard({ label, value, icon, color = 'blue' }: { 
-  label: string; 
-  value: number; 
-  icon: React.ReactNode; 
-  color?: 'blue' | 'green' | 'yellow' | 'red' 
-}) {
-  const colors = {
-    blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
-    green: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
-    yellow: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400',
-    red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
-  };
-
-  return (
-    <div className={clsx('p-4 rounded-xl text-center', colors[color])}>
-      <div className="flex items-center justify-center mb-2">
-        {icon}
-      </div>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-sm">{label}</p>
-    </div>
-  );
-}
-
-function FileHistoryRow({ file, index }: { file: any; index: number }) {
-  const statusColors = {
-    completed: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-    skipped: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
-    failed: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-  };
-
-  const statusIcons = {
-    completed: CheckCircle,
-    skipped: XCircle,
-    failed: AlertCircle,
-  };
-
-  const Icon = statusIcons[file.status] || FileText;
-
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-      <span className="text-sm text-gray-500 dark:text-gray-400 w-6 text-right">{index + 1}.</span>
-      <span className="flex-1 truncate font-mono text-sm">{file.file.split(/[\\/]/).pop()}</span>
-      {file.new_name && (
-        <span className="flex-1 truncate font-mono text-sm text-blue-600 dark:text-blue-400">
-          → {file.new_name}
-        </span>
-      )}
-      <Badge variant={file.status as any} size="sm">
-        {file.status}
-      </Badge>
     </div>
   );
 }

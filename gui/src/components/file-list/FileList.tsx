@@ -10,8 +10,6 @@ import { FileRow } from './FileRow';
 import { DropZone } from './DropZone';
 import { Button } from '@/components/ui';
 import { Loader2, RotateCcw, Plus, X, Undo2 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
 export function FileList() {
   const { t } = useTranslation();
@@ -20,11 +18,9 @@ export function FileList() {
     processing,
     progress,
     lastResult,
-    dryRunResult,
     statusError,
     addFiles,
     clearFiles,
-    view,
   } = useAppStore();
 
   const {
@@ -40,7 +36,7 @@ export function FileList() {
   const pendingCount = files.filter(f => f.status === 'pending' || f.status === 'skipped').length;
   const dragActiveRef = { current: false };
 
-  const { cleanup } = useDragDrop({
+  useDragDrop({
     onHover: (hovering) => {
       dragActiveRef.current = hovering;
       // Force re-render by updating a dummy state

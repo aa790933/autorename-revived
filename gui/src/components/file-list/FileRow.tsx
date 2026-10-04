@@ -2,11 +2,9 @@
  * File List Components - File Row
  */
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, CheckCircle, AlertCircle, Clock, XCircle, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui';
-import { Badge } from '@/components/ui';
+import { ChevronRight, CheckCircle, AlertCircle, Clock, XCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { Button, Badge } from '@/components/ui';
 import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { escapeHtml } from '@/utils/helpers';
 import type { FileEntry } from '@/types';
 

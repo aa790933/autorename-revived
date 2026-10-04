@@ -2,6 +2,9 @@
  * Utility functions for AutoRename-Revived
  */
 
+// This is replaced by Vite at build time
+export const __APP_VERSION__ = '__APP_VERSION__';
+
 export const SUPPORTED_EXTENSIONS = [
   '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.pptm',
   '.csv', '.txt', '.md', '.rtf', '.html', '.htm', '.json', '.xml',

@@ -2,12 +2,8 @@
  * Settings Components - Provider Selector
  */
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '@/store';
-import { Button } from '@/components/ui';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
-const PROVIDERS = [
+export const PROVIDERS = [
   { 
     id: 'gemini', 
     label: 'Google Gemini', 

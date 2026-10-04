@@ -2,10 +2,9 @@
  * Views - About View
  */
 import { useTranslation } from 'react-i18next';
-import { Github, AlertCircle, FileText, CheckCircle, Star, Heart } from 'lucide-react';
-import { Button, Card, Badge } from '@/components/ui';
+import { Github, AlertCircle, FileText, CheckCircle, Heart } from 'lucide-react';
+import { Card, Badge } from '@/components/ui';
 import { __APP_VERSION__ } from '@/utils/helpers';
-import { clsx } from 'clsx';
 
 const FEATURES = [
   { icon: CheckCircle, label: 'about.features.nativeBackend' },

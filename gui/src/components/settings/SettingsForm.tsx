@@ -8,8 +8,6 @@ import { saveConfigBatch, testApiConnection, reloadConfig } from '@/services/api
 import { ProviderSelector, PROVIDERS } from './ProviderSelector';
 import { Button, Input, Textarea, Select, Toggle } from '@/components/ui';
 import { showToast } from '@/hooks/useToast';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
 const PROVIDER_MODEL_KEYS: Record<string, 'gemini_model' | 'model' | 'custom_model'> = {
   gemini: 'gemini_model',
@@ -59,7 +57,7 @@ interface SettingsFormProps {
 
 export function SettingsForm({ onBack }: SettingsFormProps) {
   const { t } = useTranslation();
-  const { config, setConfig, updateConfig } = useAppStore();
+  const { config, setConfig } = useAppStore();
   const [localConfig, setLocalConfig] = useState<typeof config>(config);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -334,7 +332,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             min={0}
             max={2}
             step={0.1}
-            value={localConfig.ai.temperature}
+            value={String(localConfig.ai.temperature)}
             onChange={(e) => handleChangeNumber('ai', 'temperature', parseFloat(e.target.value) || 0)}
             error={errors['ai.temperature']}
           />
@@ -345,7 +343,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             type="number"
             min={5}
             max={600}
-            value={localConfig.ai.timeout}
+            value={String(localConfig.ai.timeout)}
             onChange={(e) => handleChangeNumber('ai', 'timeout', parseInt(e.target.value) || 30)}
             error={errors['ai.timeout']}
           />
@@ -391,7 +389,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             min={0}
             max={1}
             step={0.05}
-            value={localConfig.document.text_quality_threshold}
+            value={String(localConfig.document.text_quality_threshold)}
             onChange={(e) => handleChangeNumber('document', 'text_quality_threshold', parseFloat(e.target.value) || 0.2)}
             error={errors['document.text_quality_threshold']}
           />
@@ -443,7 +441,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             type="number"
             min={16}
             max={255}
-            value={localConfig.naming.max_length}
+            value={String(localConfig.naming.max_length)}
             onChange={(e) => handleChangeNumber('naming', 'max_length', parseInt(e.target.value) || 128)}
             error={errors['naming.max_length']}
           />
@@ -453,7 +451,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             type="number"
             min={1}
             max={9}
-            value={localConfig.naming.sequence_zerofill}
+            value={String(localConfig.naming.sequence_zerofill)}
             onChange={(e) => handleChangeNumber('naming', 'sequence_zerofill', parseInt(e.target.value) || 2)}
             error={errors['naming.sequence_zerofill']}
           />
@@ -509,7 +507,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             type="number"
             min={1}
             max={100000}
-            value={localConfig.undo.max_entries}
+            value={String(localConfig.undo.max_entries)}
             onChange={(e) => handleChangeNumber('undo', 'max_entries', parseInt(e.target.value) || 100)}
             error={errors['undo.max_entries']}
           />
@@ -533,7 +531,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             type="number"
             min={1}
             max={32}
-            value={localConfig.max_workers}
+            value={String(localConfig.max_workers)}
             onChange={(e) => handleChangeNumber('', 'max_workers', parseInt(e.target.value) || 4)}
             error={errors['max_workers']}
           />

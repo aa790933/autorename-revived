@@ -134,7 +134,7 @@ export const useAppStore = create<AppState>()(
     setProcessing: (processing, progress = '') => set({ processing, progress }),
 
     // Results actions
-    setResults: (result, isDryRun) => set(state => {
+    setResults: (result, isDryRun) => set(_state => {
       if (isDryRun) {
         return { dryRunResult: result };
       }
