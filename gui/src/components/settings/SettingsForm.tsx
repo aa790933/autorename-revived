@@ -60,7 +60,7 @@ interface SettingsFormProps {
 export function SettingsForm({ onBack }: SettingsFormProps) {
   const { t } = useTranslation();
   const { config, setConfig, updateConfig } = useAppStore();
-  const [localConfig, setLocalConfig] = useState(config);
+  const [localConfig, setLocalConfig] = useState<typeof config>(config);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -73,13 +73,16 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
   }, [config]);
 
   const handleChange = (section: string, key: string, value: string) => {
-    setLocalConfig(prev => ({
-      ...prev!,
-      [section]: {
-        ...prev![section],
-        [key]: value,
-      },
-    }));
+    setLocalConfig(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: value,
+        },
+      };
+    });
     setErrors(prev => {
       const next = { ...prev };
       delete next[`${section}.${key}`];
@@ -88,33 +91,42 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
   };
 
   const handleChangeNumber = (section: string, key: string, value: number) => {
-    setLocalConfig(prev => ({
-      ...prev!,
-      [section]: {
-        ...prev![section],
-        [key]: value,
-      },
-    }));
+    setLocalConfig(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: value,
+        },
+      };
+    });
   };
 
   const handleChangeBoolean = (section: string, key: string, value: boolean) => {
-    setLocalConfig(prev => ({
-      ...prev!,
-      [section]: {
-        ...prev![section],
-        [key]: value,
-      },
-    }));
+    setLocalConfig(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: value,
+        },
+      };
+    });
   };
 
   const handleChangeArray = (section: string, key: string, value: string[]) => {
-    setLocalConfig(prev => ({
-      ...prev!,
-      [section]: {
-        ...prev![section],
-        [key]: value,
-      },
-    }));
+    setLocalConfig(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [key]: value,
+        },
+      };
+    });
   };
 
   const collectUpdates = () => {
@@ -287,7 +299,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
           <Input
             label={t('settings.aiProvider.apiKey')}
             type="password"
-            value={localConfig.ai.api_key}
+            value={localConfig.ai.api_key ?? ''}
             onChange={(e) => handleChange('ai', 'api_key', e.target.value)}
             placeholder="••••••••"
             error={errors['ai.api_key']}
@@ -297,7 +309,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
           {/* Model */}
           <Input
             label={t('settings.aiProvider.model')}
-            value={localConfig.ai[modelKey]}
+            value={localConfig.ai[modelKey] ?? ''}
             onChange={(e) => handleChange('ai', modelKey, e.target.value)}
             placeholder={provider === 'gemini' ? 'gemini-2.0-flash' : provider === 'openai' ? 'gpt-4o-mini' : 'llama3.2'}
             error={errors[`ai.${modelKey}`]}
@@ -308,7 +320,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             <Input
               key={field.key}
               label={t(field.label)}
-              value={localConfig.ai[field.key]}
+              value={localConfig.ai[field.key] ?? ''}
               onChange={(e) => handleChange('ai', field.key, e.target.value)}
               placeholder={field.hint ? t(field.hint) : undefined}
               error={errors[`ai.${field.key}`]}
@@ -336,12 +348,12 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             value={localConfig.ai.timeout}
             onChange={(e) => handleChangeNumber('ai', 'timeout', parseInt(e.target.value) || 30)}
             error={errors['ai.timeout']}
-          );
+          />
 
           {/* System Prompt */}
           <Textarea
             label={t('settings.aiProvider.systemPrompt')}
-            value={localConfig.ai.system_prompt}
+            value={localConfig.ai.system_prompt ?? ''}
             onChange={(e) => handleChange('ai', 'system_prompt', e.target.value)}
             placeholder={t('settings.aiProvider.systemPromptHint')}
             rows={6}
@@ -367,7 +379,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
 
           <Input
             label={t('settings.documentProcessing.visionProvider')}
-            value={localConfig.document.vision_provider}
+            value={localConfig.document.vision_provider ?? ''}
             onChange={(e) => handleChange('document', 'vision_provider', e.target.value)}
             placeholder={t('settings.documentProcessing.visionProviderHint')}
             error={errors['document.vision_provider']}
@@ -394,7 +406,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <Input
             label={t('settings.fileNaming.template')}
-            value={localConfig.naming.template}
+            value={localConfig.naming.template ?? ''}
             onChange={(e) => handleChange('naming', 'template', e.target.value)}
             placeholder="{date}_{doctype}_{company}_{subject}"
             error={errors['naming.template']}
@@ -403,7 +415,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
 
           <Input
             label={t('settings.fileNaming.fallback')}
-            value={localConfig.naming.fallback}
+            value={localConfig.naming.fallback ?? ''}
             onChange={(e) => handleChange('naming', 'fallback', e.target.value)}
             placeholder="{date}_{doctype}_{company}_Unknown"
             error={errors['naming.fallback']}
@@ -412,7 +424,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
 
           <Input
             label={t('settings.fileNaming.dateFormat')}
-            value={localConfig.naming.date_format}
+            value={localConfig.naming.date_format ?? ''}
             onChange={(e) => handleChange('naming', 'date_format', e.target.value)}
             placeholder="%Y%m%d"
             error={errors['naming.date_format']}
@@ -420,7 +432,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
 
           <Input
             label={t('settings.fileNaming.separator')}
-            value={localConfig.naming.separator}
+            value={localConfig.naming.separator ?? ''}
             onChange={(e) => handleChange('naming', 'separator', e.target.value)}
             placeholder="_"
             error={errors['naming.separator']}
@@ -444,7 +456,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             value={localConfig.naming.sequence_zerofill}
             onChange={(e) => handleChangeNumber('naming', 'sequence_zerofill', parseInt(e.target.value) || 2)}
             error={errors['naming.sequence_zerofill']}
-          );
+          />
         </div>
       </section>
 
@@ -456,7 +468,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <Input
             label={t('settings.aiLanguages.primaryLanguage')}
-            value={localConfig.naming.primary_language}
+            value={localConfig.naming.primary_language ?? ''}
             onChange={(e) => handleChange('naming', 'primary_language', e.target.value)}
             placeholder="English"
             error={errors['naming.primary_language']}
@@ -464,7 +476,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
 
           <Input
             label={t('settings.aiLanguages.suggestionLanguages')}
-            value={localConfig.naming.suggestion_languages.join(', ')}
+            value={localConfig.naming.suggestion_languages?.join(', ') ?? ''}
             onChange={(e) => handleChangeArray('naming', 'suggestion_languages', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
             placeholder={t('settings.aiLanguages.suggestionLanguagesHint')}
             error={errors['naming.suggestion_languages']}
@@ -486,7 +498,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
 
           <Input
             label={t('settings.undoHistory.logPath')}
-            value={localConfig.undo.log_path}
+            value={localConfig.undo.log_path ?? ''}
             onChange={(e) => handleChange('undo', 'log_path', e.target.value)}
             placeholder={t('settings.undoHistory.logPathHint')}
             error={errors['undo.log_path']}

@@ -48,7 +48,10 @@ export function Toaster() {
           role="alert"
         >
           <div className="flex-shrink-0 mt-0.5">
-            <ICONS[toast.type] className="w-5 h-5" aria-hidden="true" />
+            {(() => {
+              const IconComponent = ICONS[toast.type as keyof typeof ICONS];
+              return <IconComponent className="w-5 h-5" aria-hidden="true" />;
+            })()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{toast.message}</p>
