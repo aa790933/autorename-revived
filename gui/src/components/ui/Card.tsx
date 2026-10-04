@@ -2,7 +2,6 @@
  * Base UI Components - Card, Badge, Separator
  */
 import { HTMLAttributes, forwardRef } from 'react';
-import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 // Card

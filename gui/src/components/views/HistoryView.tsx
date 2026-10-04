@@ -2,16 +2,9 @@
  * Views - History View
  */
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
-import { Clock, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { Clock, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Button, Card, Badge } from '@/components/ui';
 import { useAppStore } from '@/store';
-
-const STATUS_COLORS = {
-  completed: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
-  skipped: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
-  failed: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
-} as const;
 
 const STAT_CARD_COLORS = {
   blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
@@ -49,14 +42,6 @@ interface FileHistoryRowProps {
 }
 
 function FileHistoryRow({ file, index }: FileHistoryRowProps) {
-  const statusIcons = {
-    completed: CheckCircle,
-    skipped: XCircle,
-    failed: AlertCircle,
-  } as const;
-
-  const Icon = statusIcons[file.status as keyof typeof statusIcons] || FileText;
-
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
       <span className="text-sm text-gray-500 dark:text-gray-400 w-6 text-right">{index + 1}.</span>
@@ -66,7 +51,7 @@ function FileHistoryRow({ file, index }: FileHistoryRowProps) {
           → {file.new_name}
         </span>
       )}
-      <Badge variant={file.status as any} size="sm">
+      <Badge variant={file.status as 'default' | 'success' | 'warning' | 'danger' | 'info' | 'processing'} size="sm">
         {file.status}
       </Badge>
     </div>
@@ -76,7 +61,6 @@ function FileHistoryRow({ file, index }: FileHistoryRowProps) {
 export function HistoryView() {
   const { t } = useTranslation();
   const { lastResult, lastBatchId, clearFiles } = useAppStore();
-  const [expandedBatch, setExpandedBatch] = useState<string | null>(null);
 
   if (!lastResult || !lastBatchId) {
     return (

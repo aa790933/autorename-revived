@@ -78,7 +78,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 Checkbox.displayName = 'Checkbox';
 
 // Radio Group
-interface RadioGroupProps extends HTMLAttributes<HTMLDivElement> {
+interface RadioGroupProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange'> {
   name: string;
   value: string;
   onChange: (value: string) => void;
@@ -86,6 +86,8 @@ interface RadioGroupProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export function RadioGroup({ name, value, onChange, children, className, ...props }: RadioGroupProps) {
+  void value;
+  void onChange;
   return (
     <div role="radiogroup" aria-label={name} className={twMerge('space-y-2', className)} {...props}>
       {children}

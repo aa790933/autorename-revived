@@ -2,6 +2,7 @@
  * Settings Components - Provider Selector
  */
 import { useTranslation } from 'react-i18next';
+import { twMerge } from 'tailwind-merge';
 
 export const PROVIDERS = [
   { 

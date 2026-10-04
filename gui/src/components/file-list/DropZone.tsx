@@ -3,8 +3,9 @@
  */
 import { useTranslation } from 'react-i18next';
 import { FileText, Upload, FolderOpen } from 'lucide-react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/ui';
-import { pickFiles, pickFolder } from '@/services/filepicker';
 
 interface DropZoneProps {
   onBrowseFiles: () => void;

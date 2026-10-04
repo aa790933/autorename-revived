@@ -8,8 +8,12 @@ import { saveConfigBatch, testApiConnection, reloadConfig } from '@/services/api
 import { ProviderSelector, PROVIDERS } from './ProviderSelector';
 import { Button, Input, Textarea, Select, Toggle } from '@/components/ui';
 import { showToast } from '@/hooks/useToast';
+import type { AppConfig, AiConfig, DocumentConfig, NamingConfig, UndoConfig } from '@/types';
 
-const PROVIDER_MODEL_KEYS: Record<string, 'gemini_model' | 'model' | 'custom_model'> = {
+type NestedSection = 'ai' | 'document' | 'naming' | 'undo';
+type NestedConfig = AiConfig | DocumentConfig | NamingConfig | UndoConfig;
+
+const PROVIDER_MODEL_KEYS: Record<string, keyof AiConfig> = {
   gemini: 'gemini_model',
   openai: 'model',
   anthropic: 'model',
@@ -18,7 +22,7 @@ const PROVIDER_MODEL_KEYS: Record<string, 'gemini_model' | 'model' | 'custom_mod
   custom: 'custom_model',
 };
 
-const PROVIDER_FIELDS: Record<string, { key: string; label: string; hint?: string }[]> = {
+const PROVIDER_FIELDS: Record<string, { key: keyof AiConfig; label: string; hint?: string }[]> = {
   gemini: [
     { key: 'gemini_model', label: 'settings.aiProvider.model', hint: 'settings.aiProvider.modelHint' },
     { key: 'gemini_base_url', label: 'settings.aiProvider.baseUrl', hint: 'settings.aiProvider.baseUrlHint' },
@@ -55,6 +59,22 @@ interface SettingsFormProps {
   onBack: () => void;
 }
 
+function updateNestedSection(
+  prev: AppConfig,
+  section: NestedSection,
+  key: string,
+  value: unknown
+): AppConfig {
+  const sectionData = prev[section] as NestedConfig;
+  return {
+    ...prev,
+    [section]: {
+      ...sectionData,
+      [key]: value,
+    },
+  };
+}
+
 export function SettingsForm({ onBack }: SettingsFormProps) {
   const { t } = useTranslation();
   const { config, setConfig } = useAppStore();
@@ -70,16 +90,10 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
     }
   }, [config]);
 
-  const handleChange = (section: string, key: string, value: string) => {
+  const handleChange = (section: NestedSection, key: string, value: string) => {
     setLocalConfig(prev => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        [section]: {
-          ...prev[section],
-          [key]: value,
-        },
-      };
+      return updateNestedSection(prev, section, key, value);
     });
     setErrors(prev => {
       const next = { ...prev };
@@ -88,42 +102,30 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
     });
   };
 
-  const handleChangeNumber = (section: string, key: string, value: number) => {
+  const handleChangeNumber = (section: NestedSection | '', key: string, value: number) => {
     setLocalConfig(prev => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        [section]: {
-          ...prev[section],
-          [key]: value,
-        },
-      };
+      if (section === '') {
+        return { ...prev, [key]: value };
+      }
+      return updateNestedSection(prev, section, key, value);
     });
   };
 
-  const handleChangeBoolean = (section: string, key: string, value: boolean) => {
+  const handleChangeBoolean = (section: NestedSection | '', key: string, value: boolean) => {
     setLocalConfig(prev => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        [section]: {
-          ...prev[section],
-          [key]: value,
-        },
-      };
+      if (section === '') {
+        return { ...prev, [key]: value };
+      }
+      return updateNestedSection(prev, section, key, value);
     });
   };
 
-  const handleChangeArray = (section: string, key: string, value: string[]) => {
+  const handleChangeArray = (section: NestedSection, key: string, value: string[]) => {
     setLocalConfig(prev => {
       if (!prev) return prev;
-      return {
-        ...prev,
-        [section]: {
-          ...prev[section],
-          [key]: value,
-        },
-      };
+      return updateNestedSection(prev, section, key, value);
     });
   };
 
@@ -135,9 +137,11 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
     const original = config;
     if (!original) return updates;
 
-    const checkField = (section: string, key: string) => {
-      const originalVal = original[section]?.[key];
-      const localVal = localConfig[section]?.[key];
+    const checkNestedField = (section: NestedSection, key: string) => {
+      const originalSection = original[section] as Record<string, unknown>;
+      const localSection = localConfig[section] as Record<string, unknown>;
+      const originalVal = originalSection[key];
+      const localVal = localSection[key];
       if (originalVal !== localVal) {
         updates.push({
           key: `${section}.${key}`,
@@ -146,48 +150,54 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
       }
     };
 
+    const checkTopLevelField = (key: keyof AppConfig) => {
+      const originalVal = original[key];
+      const localVal = localConfig[key];
+      if (originalVal !== localVal) {
+        updates.push({
+          key,
+          value: String(localVal ?? ''),
+        });
+      }
+    };
+
     // AI fields
-    checkField('ai', 'provider');
-    checkField('ai', 'api_key');
-    checkField('ai', 'model');
-    checkField('ai', 'gemini_model');
-    checkField('ai', 'base_url');
-    checkField('ai', 'gemini_base_url');
-    checkField('ai', 'custom_model');
-    checkField('ai', 'custom_base_url');
-    checkField('ai', 'ollama_base_url');
-    checkField('ai', 'temperature');
-    checkField('ai', 'timeout');
-    checkField('ai', 'system_prompt');
+    checkNestedField('ai', 'provider');
+    checkNestedField('ai', 'api_key');
+    checkNestedField('ai', 'model');
+    checkNestedField('ai', 'gemini_model');
+    checkNestedField('ai', 'base_url');
+    checkNestedField('ai', 'gemini_base_url');
+    checkNestedField('ai', 'custom_model');
+    checkNestedField('ai', 'custom_base_url');
+    checkNestedField('ai', 'ollama_base_url');
+    checkNestedField('ai', 'temperature');
+    checkNestedField('ai', 'timeout');
+    checkNestedField('ai', 'system_prompt');
 
     // Document fields
-    checkField('document', 'vision');
-    checkField('document', 'vision_provider');
-    checkField('document', 'text_quality_threshold');
+    checkNestedField('document', 'vision');
+    checkNestedField('document', 'vision_provider');
+    checkNestedField('document', 'text_quality_threshold');
 
     // Naming fields
-    checkField('naming', 'template');
-    checkField('naming', 'fallback');
-    checkField('naming', 'date_format');
-    checkField('naming', 'separator');
-    checkField('naming', 'max_length');
-    checkField('naming', 'sequence_zerofill');
-    checkField('naming', 'primary_language');
-    checkField('naming', 'suggestion_languages');
+    checkNestedField('naming', 'template');
+    checkNestedField('naming', 'fallback');
+    checkNestedField('naming', 'date_format');
+    checkNestedField('naming', 'separator');
+    checkNestedField('naming', 'max_length');
+    checkNestedField('naming', 'sequence_zerofill');
+    checkNestedField('naming', 'primary_language');
+    checkNestedField('naming', 'suggestion_languages');
 
     // Undo fields
-    checkField('undo', 'enabled');
-    checkField('undo', 'log_path');
-    checkField('undo', 'max_entries');
+    checkNestedField('undo', 'enabled');
+    checkNestedField('undo', 'log_path');
+    checkNestedField('undo', 'max_entries');
 
     // General fields
-    checkField('', 'debug');
-    checkField('', 'max_workers');
-
-    // Always include provider
-    if (localConfig.ai.provider !== original.ai.provider) {
-      updates.push({ key: 'ai.provider', value: localConfig.ai.provider });
-    }
+    checkTopLevelField('debug');
+    checkTopLevelField('max_workers');
 
     return updates;
   };
@@ -233,12 +243,12 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
     if (!localConfig) return;
     setTesting(true);
     try {
-      const provider = localConfig.ai.provider;
+      const currentProvider = localConfig.ai.provider;
       const apiKey = localConfig.ai.api_key;
-      const modelKey = PROVIDER_MODEL_KEYS[provider] || 'model';
-      const model = localConfig.ai[modelKey];
+      const modelKey = PROVIDER_MODEL_KEYS[currentProvider] || 'model';
+      const model = String(localConfig.ai[modelKey] ?? '');
 
-      const result = await testApiConnection(provider, apiKey, model);
+      const result = await testApiConnection(currentProvider, apiKey, model);
       if (result.success) {
         showToast(t('toasts.connectionTestSuccess', { provider: result.provider, latency: result.latency_ms }), 'success');
       } else {
@@ -283,7 +293,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
         </h3>
         <ProviderSelector
           currentProvider={localConfig.ai.provider}
-          onChange={(provider) => handleChange('ai', 'provider', provider)}
+          onChange={(nextProvider) => handleChange('ai', 'provider', nextProvider)}
         />
       </section>
 
@@ -307,7 +317,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
           {/* Model */}
           <Input
             label={t('settings.aiProvider.model')}
-            value={localConfig.ai[modelKey] ?? ''}
+            value={String(localConfig.ai[modelKey] ?? '')}
             onChange={(e) => handleChange('ai', modelKey, e.target.value)}
             placeholder={provider === 'gemini' ? 'gemini-2.0-flash' : provider === 'openai' ? 'gpt-4o-mini' : 'llama3.2'}
             error={errors[`ai.${modelKey}`]}
@@ -318,7 +328,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             <Input
               key={field.key}
               label={t(field.label)}
-              value={localConfig.ai[field.key] ?? ''}
+              value={String(localConfig.ai[field.key] ?? '')}
               onChange={(e) => handleChange('ai', field.key, e.target.value)}
               placeholder={field.hint ? t(field.hint) : undefined}
               error={errors[`ai.${field.key}`]}
