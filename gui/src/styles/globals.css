@@ -61,9 +61,7 @@
 /* Focus visible for accessibility */
 .focus-visible:focus {
   outline: none;
-  ring: 2px;
-  ring-offset: 2px;
-  ring-blue-500;
+  @apply ring-2 ring-offset-2 ring-blue-500;
 }
 
 /* Smooth transitions */
@@ -101,9 +99,7 @@ select:focus {
 /* Button focus styles */
 button:focus-visible {
   outline: none;
-  ring: 2px;
-  ring-offset: 2px;
-  ring-blue-500;
+  @apply ring-2 ring-offset-2 ring-blue-500;
 }
 
 /* Tooltip styles */
