@@ -36,7 +36,7 @@ export function escapeHtml(str: string): string {
     .replace(/</g, '<')
     .replace(/>/g, '>')
     .replace(/"/g, '"')
-    .replace(/'/g, ''');
+    .replace(/'/g, '\u0027');
 }
 
 /**
