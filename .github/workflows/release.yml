@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 env:
-  NODE_VERSION: "24"
-  PNPM_VERSION: "10"
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
   RUST_VERSION: "stable"
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
 
@@ -70,13 +70,10 @@ jobs:
         shell: pwsh
         working-directory: gui
         run: pnpm install --frozen-lockfile --config.store-dir=.\.pnpm-store
-      - name: Build frontend (CSS + TypeScript)
+      - name: Build frontend (TypeScript + Vite)
         shell: pwsh
         working-directory: gui
-        run: |
-          pnpm run colors
-          pnpm run build:css
-          pnpm run build
+        run: pnpm run build
       - name: Build Tauri GUI (portable)
         shell: pwsh
         working-directory: src-tauri
@@ -161,13 +158,10 @@ jobs:
         shell: pwsh
         working-directory: gui
         run: pnpm install --frozen-lockfile --config.store-dir=.\.pnpm-store
-      - name: Build frontend (CSS + TypeScript)
+      - name: Build frontend (TypeScript + Vite)
         shell: pwsh
         working-directory: gui
-        run: |
-          pnpm run colors
-          pnpm run build:css
-          pnpm run build
+        run: pnpm run build
       - name: Build Tauri MSI
         shell: pwsh
         working-directory: src-tauri

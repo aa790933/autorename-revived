@@ -1,9 +1,12 @@
 <div align="center">
-  <h1>AutoRename-Revived v3.0.4</h1>
-   <p><b>AI-powered batch document renamer — native Rust + Tauri backend with multi-provider LLM support.</b></p>
+  <h1>AutoRename-Revived v4.0.0</h1>
+   <p><b>AI-powered batch document renamer — native Rust + Tauri v2 backend with React + TypeScript frontend and multi-provider LLM support.</b></p>
   <p>
     <img src="https://img.shields.io/badge/rust-2021-orange?logo=rust" alt="Rust">
     <img src="https://img.shields.io/badge/tauri-v2-blue?logo=tauri" alt="Tauri">
+    <img src="https://img.shields.io/badge/react-18-61dafb?logo=react" alt="React">
+    <img src="https://img.shields.io/badge/typescript-5-3178c6?logo=typescript" alt="TypeScript">
+    <img src="https://img.shields.io/badge/tailwindcss-3-38bdf8?logo=tailwindcss" alt="Tailwind CSS">
     <img src="https://img.shields.io/badge/platform-Windows-blue?logo=windows" alt="Windows">
     <img src="https://img.shields.io/github/license/aa790933/autorename-revived" alt="MIT">
   </p>
@@ -11,7 +14,7 @@
 
 AutoRename-Revived extracts **company name**, **document date**, **document type**, **category**, and **subject** from documents (PDF, images, DOCX, XLSX, PPTX) using AI, then renames them to a consistent, customizable format — batch processing hundreds of files in seconds.
 
-Built with **Tauri v2** (Rust backend + TypeScript frontend) for ultra-fast performance — no Python runtime required.
+Built with **Tauri v2** (Rust backend + React/TypeScript frontend) for ultra-fast performance — no Python runtime required.
 
 ---
 
@@ -20,9 +23,11 @@ Built with **Tauri v2** (Rust backend + TypeScript frontend) for ultra-fast perf
 | Capability | Details |
 |---|---|
 | **Backend** | Rust + Tauri v2 (native, zero-install) |
+| **Frontend** | React 18 + TypeScript + Tailwind CSS + Zustand |
 | **AI Providers** | Gemini, OpenAI, Anthropic, Ollama, xAI, Custom |
 | **Local Extraction** | DOCX, XLSX, PPTX, PDF text extraction (no external tools) |
 | **Vision Mode** | Scanned PDFs & images analyzed via Vision LLMs |
+| **Internationalization** | English, French, Arabic (RTL support) |
 | **Portable** | Standalone EXE with portable settings (`.portable` marker) |
 | **Installer** | MSI installer with OS-global settings |
 
@@ -59,27 +64,28 @@ The renamer uses a customizable template with `{field}` placeholders. Each field
 | `{subject}` | Document subject / title | `Q3_Report` |
 | `{original}` | Original filename stem | `scan_001` |
 | `{sequence}` | Zero-filled sequence number | `_01`, `_02` |
+| `{separator}` | Configured separator | `_` |
 
 ### Default Template
 
 ```
-{date}_{company}_{doctype}
+{date}_{doctype}_{company}_{subject}
 ```
 
-Example output: `20240115_AcmeCorp_Invoice_01.pdf`
+Example output: `20240115_Invoice_AcmeCorp_Q3_Report_01.pdf`
 
 ### Fallback Template
 
-When AI extraction returns no metadata, the fallback template is used (default: `{date}_Unknown_{doctype}`). All undeterminable fields are replaced with `"Unknown"`.
+When AI extraction returns no metadata, the fallback template is used (default: `{date}_{doctype}_{company}_Unknown`). All undeterminable fields are replaced with `"Unknown"`.
 
 ### Settings
 
 | Setting | Default | Description |
 |---|---|---|
-| `naming.date_format` | `%Y%m%d` | Chrono format for parsed dates |
+| `naming.date_format` | `%Y-%m-%d` | Chrono format for parsed dates |
 | `naming.sequence_zerofill` | `2` | Padding width for `{sequence}` |
 | `naming.max_length` | `128` | Truncation limit for generated filenames |
-| `naming.separator` | `_` | Separator between fields (used when `{separator}` placeholder is in template) |
+| `naming.separator` | `_` | Separator between fields |
 
 ---
 
@@ -89,7 +95,7 @@ Supported providers and their default models:
 
 | Provider | Text Model | Vision Model | API Key Required |
 |---|---|---|---|
-| Gemini (default) | `gemini-3.5-flash-lite` | `gemini-3.5-flash-lite` | Yes |
+| Gemini (default) | `gemini-2.5-flash` | `gemini-2.5-flash` | Yes |
 | OpenAI | `gpt-4o-mini` | `gpt-4o` | Yes |
 | Anthropic | `claude-3-5-haiku-latest` | `claude-sonnet-4-20250514` | Yes |
 | Ollama | `llama3.2` | `llama3.2` | No (local) |
@@ -100,15 +106,33 @@ Supported providers and their default models:
 
 | Setting | Values | Description |
 |---|---|---|
-| `pdf.vision` | `auto`, `true`, `false` | Whether to use Vision LLM for PDF/images |
-| `pdf.vision_provider` | Any provider | Separate provider for vision (e.g. Gemini for vision, OpenAI for text) |
-| `pdf.text_quality_threshold` | `0.0` - `1.0` | Minimum local text quality before falling back to vision in `auto` mode |
+| `document.vision` | `auto`, `true`, `false` | Whether to use Vision LLM for PDF/images |
+| `document.vision_provider` | Any provider | Separate provider for vision (e.g. Gemini for vision, OpenAI for text) |
+| `document.text_quality_threshold` | `0.0` - `1.0` | Minimum local text quality before falling back to vision in `auto` mode |
 
 In `auto` mode, local text extraction runs first. If quality meets the threshold, text AI is used (cheaper). Otherwise, vision AI is used.
 
 ### System Prompt
 
 The AI system prompt is fully customizable via Settings → AI System Prompt. Leave it empty to use the built-in default, which instructs the AI to extract all five metadata fields as structured JSON.
+
+---
+
+## Internationalization
+
+AutoRename-Revived v4.0.0 supports multiple languages with full RTL (Right-to-Left) support for Arabic:
+
+| Language | Code | Direction | Status |
+|---|---|---|---|
+| English | `en` | LTR | ✅ Native |
+| French | `fr` | LTR | ✅ Native |
+| Arabic | `ar` | RTL | ✅ Native |
+
+The UI automatically adapts to the selected language, including:
+- All text translations
+- RTL layout for Arabic
+- Date/number formatting
+- Placeholder hints in settings
 
 ---
 
@@ -153,16 +177,16 @@ Folder/
 Push a `v*` tag to trigger `.github/workflows/release.yml`:
 
 ```bash
-git tag v3.0.5
-git push origin v3.0.5
+git tag v4.0.1
+git push origin v4.0.1
 ```
 
-Produces `AutoRename-v3.0.5-Portable.zip` and `AutoRename-v3.0.5.msi`.
+Produces `AutoRename-v4.0.1-Portable.zip` and `AutoRename-v4.0.1.msi`.
 
 ### Local Build
 
-```
-# Prerequisites: Rust toolchain, Node.js 24+, pnpm 10
+```bash
+# Prerequisites: Rust toolchain, Node.js 20+, pnpm 9
 cd gui
 pnpm install
 pnpm tauri build
@@ -174,29 +198,27 @@ pnpm tauri build
 
 ```
 autorename-revived/
-├── gui/                            # Frontend (TypeScript + Vite)
+├── gui/                            # Frontend (React + TypeScript + Vite)
 │   ├── src/
-│   │   ├── main.ts                 # App entry point
-│   │   ├── renderer.ts             # View routing + status bar
-│   │   ├── lib/
-│   │   │   ├── config-store.ts     # Config CRUD (in-memory + persistence)
-│   │   │   ├── sidecar.ts          # IPC wrappers for Rust commands
-│   │   │   ├── state.ts            # Pub/sub app state
-│   │   │   ├── dnd.ts              # Drag-and-drop
-│   │   │   ├── filepicker.ts       # File/folder dialogs
-│   │   │   ├── rename-cache.ts     # Dry-run cache apply via Tauri FS
-│   │   │   ├── theme.ts            # Dark/light toggle
-│   │   │   ├── titlebar.ts         # Custom window controls
-│   │   │   ├── toast.ts            # Toast notifications
-│   │   │   └── utils.ts            # Extension helpers, escapeHtml
-│   │   ├── views/
-│   │   │   ├── files.ts            # Main file list + rename pipeline
-│   │   │   ├── settings.ts         # Settings form + provider switcher
-│   │   │   └── about.ts            # About page
-│   │   └── css/                    # Catppuccin theme
+│   │   ├── main.tsx                # App entry point
+│   │   ├── App.tsx                 # Main app component
+│   │   ├── components/
+│   │   │   ├── ui/                 # Base UI components (Button, Input, Card, etc.)
+│   │   │   ├── layout/             # Layout components (Sidebar, Header, Toaster)
+│   │   │   ├── file-list/          # File list components (FileRow, DropZone, FileList)
+│   │   │   ├── settings/           # Settings components (ProviderSelector, SettingsForm)
+│   │   │   └── views/              # Page views (HistoryView, AboutView)
+│   │   ├── hooks/                  # Custom React hooks
+│   │   ├── store/                  # Zustand state management
+│   │   ├── services/               # API services (Tauri IPC wrappers)
+│   │   ├── types/                  # TypeScript type definitions
+│   │   ├── i18n/                   # Internationalization (i18next)
+│   │   ├── utils/                  # Utility functions
+│   │   └── styles/                 # Global styles
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vite.config.ts
+│   ├── tailwind.config.js
 │   └── index.html
 │
 ├── src-tauri/                      # Backend (Rust + Tauri v2)
@@ -207,9 +229,9 @@ autorename-revived/
 │   │   ├── config.rs               # AppConfig model, persistence, env resolution
 │   │   ├── document.rs             # Filename generation, undo history, path safety
 │   │   ├── extractors.rs           # Local text extraction (DOCX, XLSX, PPTX, PDF)
-│   │   ├── file_utils.rs           # File system utilities
-│   │   └── portable.rs             # Portable vs installer detection
-│   ├── dependencies/               # Tauri capabilities
+│   │   ├── portable.rs             # Portable vs installer detection
+│   │   └── error.rs                # Unified error types
+│   ├── capabilities/               # Tauri capabilities
 │   ├── Cargo.toml
 │   ├── tauri.conf.json
 │   └── build.rs
@@ -228,12 +250,37 @@ The frontend communicates with the Rust backend via Tauri IPC commands:
 
 | Category | Commands |
 |---|---|
-| **Rename Pipeline** | `rename_pdfs`, `cancel_rename`, `undo_rename` |
-| **Config** | `load_app_config`, `save_app_config`, `save_app_config_batch`, `get_config`, `get_config_path`, `save_config_cmd`, `validate_config` |
+| **Rename Pipeline** | `rename_files`, `cancel_rename`, `undo_rename` |
+| **Config** | `load_app_config`, `save_app_config`, `save_app_config_batch`, `get_config`, `get_config_path`, `validate_config` |
 | **AI Extraction** | `extract_metadata_from_text`, `extract_metadata_from_vision`, `test_connection` |
 | **File I/O** | `read_file_bytes`, `read_file_base64`, `preserve_file_extension`, `validate_extension`, `is_image_file`, `get_file_size_bytes`, `get_file_name_from_path`, `get_file_stem_from_path`, `get_file_ext`, `resolve_safe_path_cmd`, `ensure_directory_cmd`, `copy_file_cmd`, `file_exists_cmd`, `list_files`, `find_files_recursive` |
 | **Rename Helpers** | `apply_rename_cmd`, `save_rename_to_history_cmd`, `undo_last_rename_cmd` |
-| **Utility** | `get_version`, `get_supported_extensions_list`, `is_portable_app`, `get_settings_path` |
+| **Utility** | `get_version`, `get_supported_extensions_list`, `is_portable_app`, `get_settings_path`, `get_undo_log_path` |
+
+---
+
+## Architecture Highlights
+
+### Modern Frontend (v4.0.0)
+- **React 18** with TypeScript for type-safe UI development
+- **Zustand** for lightweight, scalable state management
+- **i18next** for internationalization with RTL support
+- **Tailwind CSS** for utility-first styling
+- **Lucide React** for beautiful, consistent icons
+- **Component-based architecture** for maintainability
+
+### Robust Backend
+- **Unified error handling** with `thiserror`
+- **Async pipeline** with bounded concurrency
+- **Multi-language AI extraction** with aligned results
+- **Vision fallback** with quality assessment
+- **Portable-aware** path resolution
+
+### Performance Optimizations
+- **Fat LTO** for smaller, faster binaries
+- **Single codegen unit** for optimal Rust compilation
+- **Lazy-loaded chunks** for frontend (React, i18n, Tauri API)
+- **Bounded worker pool** for AI requests
 
 ---
 

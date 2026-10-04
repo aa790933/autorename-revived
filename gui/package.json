@@ -1,45 +1,42 @@
 {
   "name": "autorename-revived-gui",
   "private": true,
-  "version": "3.0.4",
+  "version": "4.0.0",
   "packageManager": "pnpm@9.15.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm run colors && pnpm run build:css && tsc && vite build",
-    "build:css": "tailwindcss -i ./src/css/index.css -o ./src/css/tailwind.css --minify",
-    "colors": "node scripts/generate-colors.js --config colors.json --output src/css/generated-colors.css --format css",
+    "build": "tsc && vite build",
+    "build:tauri": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "lint": "eslint src --ext ts,tsx",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "icons": "node scripts/generate-app-icons.cjs --config icons.config.json"
+    "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.10.1",
-    "@tauri-apps/plugin-dialog": "2.6.0",
-    "@tauri-apps/plugin-fs": "2.4.5",
-    "@tauri-apps/plugin-opener": "2.5.4"
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-opener": "^2.5.4",
+    "clsx": "^2.1.1",
+    "i18next": "^23.12.3",
+    "i18next-browser-languagedetector": "^8.0.0",
+    "lucide-react": "^0.428.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^15.0.1",
+    "tailwind-merge": "^2.4.0",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.1.11",
-    "@tauri-apps/cli": "2.10.1",
-    "@types/node": "^22.10.0",
-    "@vitest/coverage-v8": "^4.0.0",
-    "culori": "^4.0.2",
-    "jsdom": "^26.0.0",
-    "png2icons": "^2.0.1",
-    "sharp": "^0.34.5",
-    "typescript": "^5.9.2",
-    "vite": "^6.3.0",
-    "vitest": "^4.0.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sharp",
-      "esbuild",
-      "@parcel/watcher"
-    ]
+    "@tauri-apps/cli": "^2.10.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.5"
   }
 }

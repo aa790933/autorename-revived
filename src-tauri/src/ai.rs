@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use tracing::info;
 
-const GEMINI_DEFAULT_MODEL: &str = "gemini-3.5-flash-lite";
+const GEMINI_DEFAULT_MODEL: &str = "gemini-2.5-flash";
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com";
 const OPENAI_API_BASE: &str = "https://api.openai.com";
 const ANTHROPIC_API_BASE: &str = "https://api.anthropic.com";

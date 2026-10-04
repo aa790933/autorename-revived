@@ -1,0 +1,238 @@
+/**
+ * Global styles for AutoRename-Revived v4.0.0
+ * Tailwind CSS + custom styles
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom animations */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* RTL support */
+[dir="rtl"] {
+  direction: rtl;
+}
+
+[dir="rtl"] .flex-row-reverse {
+  flex-direction: row-reverse;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Focus visible for accessibility */
+.focus-visible:focus {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-blue-500;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Disable transitions for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom selection colors */
+::selection {
+  background-color: #3b82f6;
+  color: white;
+}
+
+/* Input focus styles */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+/* Button focus styles */
+button:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  ring-blue-500;
+}
+
+/* Tooltip styles */
+.tooltip {
+  @apply absolute z-50 px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-100 rounded shadow-lg;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin rounded-full border-2 border-gray-200 border-t-blue-600;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+}
+
+/* File row animations */
+.file-row-enter {
+  @apply animate-slide-in;
+}
+
+/* Glass morphism effect */
+.glass {
+  @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm;
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600;
+}
+
+/* Status indicators */
+.status-dot {
+  @apply w-2 h-2 rounded-full;
+}
+
+.status-pending { @apply bg-gray-400; }
+.status-processing { @apply bg-blue-500 animate-pulse; }
+.status-completed { @apply bg-green-500; }
+.status-skipped { @apply bg-yellow-500; }
+.status-failed { @apply bg-red-500; }
+
+/* Drag and drop styles */
+.drop-zone-active {
+  @apply border-blue-500 bg-blue-50 dark:bg-blue-900/20;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4;
+}
+
+/* Tooltip arrow */
+.tooltip-arrow::before {
+  content: '';
+  @apply absolute w-2 h-2 bg-gray-900 dark:bg-gray-100 transform rotate-45;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full bg-blue-600 rounded-full transition-all duration-300 ease-out;
+}
+
+/* Empty state */
+.empty-state {
+  @apply flex flex-col items-center justify-center py-16 px-4 text-center;
+}
+
+.empty-state-icon {
+  @apply w-16 h-16 text-gray-300 dark:text-gray-600 mb-4;
+}
+
+.empty-state-title {
+  @apply text-xl font-semibold text-gray-900 dark:text-white mb-2;
+}
+
+.empty-state-description {
+  @apply text-gray-500 dark:text-gray-400 max-w-md;
+}
+
+/* Badge variants */
+.badge-success { @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400; }
+.badge-warning { @apply bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400; }
+.badge-danger { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+.badge-info { @apply bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400; }
+.badge-processing { @apply bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 animate-pulse; }
+
+/* Form styles */
+.form-group {
+  @apply space-y-1.5;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 dark:text-gray-300;
+}
+
+.form-input {
+  @apply w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+         disabled:opacity-50 disabled:cursor-not-allowed
+         placeholder:text-gray-400 dark:placeholder:text-gray-500;
+}
+
+.form-input-error {
+  @apply border-red-500 focus:ring-red-500;
+}
+
+.form-hint {
+  @apply text-sm text-gray-500 dark:text-gray-400;
+}
+
+.form-error {
+  @apply text-sm text-red-500;
+}
+
+/* Section styles */
+.section {
+  @apply space-y-4;
+}
+
+.section-title {
+  @apply text-lg font-semibold text-gray-900 dark:text-white mb-4;
+}
+
+.section-description {
+  @apply text-sm text-gray-500 dark:text-gray-400;
+}
