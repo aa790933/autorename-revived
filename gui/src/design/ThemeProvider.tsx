@@ -17,7 +17,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { theme, setTheme: setStoreTheme, sidebarOpen } = useAppStore();
+  const { theme, setTheme: setStoreTheme } = useAppStore();
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
 

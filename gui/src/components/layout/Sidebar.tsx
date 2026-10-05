@@ -17,7 +17,6 @@ import {
 import { useAppStore } from '@/store';
 import { Button } from '@/components/ui';
 import { SUPPORTED_LANGUAGES, getLanguageDirection } from '@/i18n';
-import { useTheme } from '@/design/ThemeProvider';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
@@ -36,7 +35,6 @@ const THEME_OPTIONS = [
 export function Sidebar() {
   const { t } = useTranslation();
   const { view, setView, sidebarOpen, toggleSidebar, theme, setTheme, language } = useAppStore();
-  const { theme: resolvedTheme, setTheme: setResolvedTheme } = useTheme();
   const isRTL = getLanguageDirection(language as any) === 'rtl';
 
   return (
