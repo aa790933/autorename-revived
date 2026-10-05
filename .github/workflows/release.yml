@@ -12,11 +12,9 @@ permissions:
   contents: write
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   PNPM_VERSION: "9"
   RUST_VERSION: "stable"
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-  # Pre-gen icon.ico on runner to avoid RC2176 "old DIB" error
   TAURI_ICON_SOURCE: "src-tauri/icons/icon-source.svg"
 
 jobs:
@@ -35,10 +33,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "${{ env.NODE_VERSION }}"
-          cache: 'pnpm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
           cache-dependency-path: gui/pnpm-lock.yaml
-      - name: Install npm deps
+      - name: Install dependencies
         shell: pwsh
         working-directory: gui
         run: pnpm install --frozen-lockfile
@@ -85,8 +83,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "${{ env.NODE_VERSION }}"
-          cache: 'pnpm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
           cache-dependency-path: gui/pnpm-lock.yaml
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -100,7 +98,7 @@ jobs:
       - name: Install dependencies
         shell: pwsh
         working-directory: gui
-        run: pnpm install --no-frozen-lockfile --config.store-dir=.\\.pnpm-store
+        run: pnpm install --no-frozen-lockfile --config.store-dir=.\.pnpm-store
       - name: Build frontend (TypeScript + Vite)
         shell: pwsh
         working-directory: gui
@@ -169,8 +167,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "${{ env.NODE_VERSION }}"
-          cache: 'pnpm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
           cache-dependency-path: gui/pnpm-lock.yaml
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -184,7 +182,7 @@ jobs:
       - name: Install dependencies
         shell: pwsh
         working-directory: gui
-        run: pnpm install --no-frozen-lockfile --config.store-dir=.\\.pnpm-store
+        run: pnpm install --no-frozen-lockfile --config.store-dir=.\.pnpm-store
       - name: Build frontend (TypeScript + Vite)
         shell: pwsh
         working-directory: gui
