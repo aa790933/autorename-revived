@@ -86,7 +86,7 @@ interface RadioGroupProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange
   children: React.ReactNode;
 }
 
-export function RadioGroup({ name, value, onChange, children, className, ...props }: RadioGroupProps) {
+export function RadioGroup({ name, children, className, ...props }: RadioGroupProps) {
   return (
     <div role="radiogroup" aria-label={name} className={twMerge('space-y-2', className)} {...props}>
       {children}
