@@ -1,6 +1,8 @@
 /**
- * Base UI Components - Input
+ * Modern Input Component - AutoRename-Revived v4.0.0
+ * Accessible, typed input with proper focus states
  */
+
 import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,11 +17,11 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChan
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, hint, id, value, onChange, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
-    
+
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={inputId} className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
             {label}
           </label>
         )}
@@ -29,12 +31,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           value={value}
           onChange={onChange}
           className={twMerge(
-            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100',
-            'border-gray-300 dark:border-gray-600',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
+            'border-neutral-300 dark:border-neutral-600',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            'placeholder:text-gray-400 dark:placeholder:text-gray-500',
-            error && 'border-red-500 focus:ring-red-500',
+            'placeholder:text-neutral-400 dark:placeholder:text-neutral-500',
+            error && 'border-danger-500 focus-visible:ring-danger-500',
             className
           )}
           aria-invalid={error ? 'true' : 'false'}
@@ -42,12 +44,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {error && (
-          <p id={`${inputId}-error`} className="mt-1 text-sm text-red-500" role="alert">
+          <p id={`${inputId}-error`} className="mt-1 text-sm text-danger-600 dark:text-danger-400" role="alert">
             {error}
           </p>
         )}
         {hint && !error && (
-          <p id={`${inputId}-hint`} className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p id={`${inputId}-hint`} className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             {hint}
           </p>
         )}
@@ -69,11 +71,11 @@ interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, label, error, hint, id, value, onChange, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
-    
+
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={inputId} className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
             {label}
           </label>
         )}
@@ -83,13 +85,13 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           value={value}
           onChange={onChange}
           className={twMerge(
-            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100',
-            'border-gray-300 dark:border-gray-600',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
+            'border-neutral-300 dark:border-neutral-600',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+            'placeholder:text-neutral-400 dark:placeholder:text-neutral-500',
             'resize-y min-h-[80px]',
-            error && 'border-red-500 focus:ring-red-500',
+            error && 'border-danger-500 focus-visible:ring-danger-500',
             className
           )}
           aria-invalid={error ? 'true' : 'false'}
@@ -97,12 +99,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {error && (
-          <p id={`${inputId}-error`} className="mt-1 text-sm text-red-500" role="alert">
+          <p id={`${inputId}-error`} className="mt-1 text-sm text-danger-600 dark:text-danger-400" role="alert">
             {error}
           </p>
         )}
         {hint && !error && (
-          <p id={`${inputId}-hint`} className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p id={`${inputId}-hint`} className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             {hint}
           </p>
         )}
@@ -125,11 +127,11 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onC
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, hint, id, options, value, onChange, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, '-');
-    
+
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={selectId} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor={selectId} className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
             {label}
           </label>
         )}
@@ -139,11 +141,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           value={value}
           onChange={onChange}
           className={twMerge(
-            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100',
-            'border-gray-300 dark:border-gray-600',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
+            'border-neutral-300 dark:border-neutral-600',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            error && 'border-red-500 focus:ring-red-500',
+            error && 'border-danger-500 focus-visible:ring-danger-500',
             className
           )}
           aria-invalid={error ? 'true' : 'false'}
@@ -157,12 +159,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ))}
         </select>
         {error && (
-          <p id={`${selectId}-error`} className="mt-1 text-sm text-red-500" role="alert">
+          <p id={`${selectId}-error`} className="mt-1 text-sm text-danger-600 dark:text-danger-400" role="alert">
             {error}
           </p>
         )}
         {hint && !error && (
-          <p id={`${selectId}-hint`} className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p id={`${selectId}-hint`} className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             {hint}
           </p>
         )}

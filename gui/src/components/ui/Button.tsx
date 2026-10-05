@@ -1,59 +1,72 @@
 /**
- * Base UI Components - Button
+ * Modern Button Component - AutoRename-Revived v4.0.0
+ * Professional, accessible button with variants and states
  */
-import { forwardRef, ButtonHTMLAttributes } from 'react';
+
+import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react';
 import { twMerge } from 'tailwind-merge';
+import { loader } from '@/utils/loader';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'success';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
   loading?: boolean;
+  icon?: ReactNode;
+  iconPosition?: 'left' | 'right';
+  fullWidth?: boolean;
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading = false, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-    
-    const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-      secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600',
-      danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-      ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800',
-      outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800',
-    };
+const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap';
 
-    const sizes = {
-      sm: 'px-3 py-1.5 text-sm gap-1.5',
-      md: 'px-4 py-2 text-base gap-2',
-      lg: 'px-6 py-3 text-lg gap-2',
-    };
+const variants = {
+  primary: 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 focus-visible:ring-primary-500 shadow-sm hover:shadow-md',
+  secondary: 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 active:bg-neutral-300 focus-visible:ring-neutral-500 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700 dark:active:bg-neutral-600',
+  danger: 'bg-danger-600 text-white hover:bg-danger-700 active:bg-danger-800 focus-visible:ring-danger-500 shadow-sm hover:shadow-md',
+  ghost: 'bg-transparent text-neutral-700 hover:bg-neutral-100 active:bg-neutral-200 focus-visible:ring-neutral-500 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:active:bg-neutral-700',
+  outline: 'border border-neutral-300 text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 focus-visible:ring-neutral-500 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:active:bg-neutral-700',
+  success: 'bg-success-600 text-white hover:bg-success-700 active:bg-success-800 focus-visible:ring-success-500 shadow-sm hover:shadow-md',
+};
+
+const sizes = {
+  sm: 'px-3 py-1.5 text-sm gap-1.5',
+  md: 'px-4 py-2 text-base gap-2',
+  lg: 'px-6 py-3 text-lg gap-2',
+  icon: 'p-2',
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = 'primary', size = 'md', loading = false, disabled, children, icon, iconPosition = 'left', fullWidth = false, ...props }, ref) => {
+    const isDisabled = disabled || loading;
 
     return (
       <button
         ref={ref}
-        className={twMerge(baseStyles, variants[variant], sizes[size], className)}
-        disabled={disabled || loading}
+        className={twMerge(
+          baseStyles,
+          variants[variant],
+          sizes[size],
+          fullWidth && 'w-full',
+          className
+        )}
+        disabled={isDisabled}
+        aria-busy={loading}
+        aria-disabled={isDisabled}
         {...props}
       >
         {loading && (
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
+          <span className="flex-shrink-0" aria-hidden="true">
+            {loader({ size: size === 'sm' ? 14 : size === 'lg' ? 20 : 16, strokeWidth: 3 })}
+          </span>
         )}
-        {children}
+        {!loading && icon && iconPosition === 'left' && (
+          <span className="flex-shrink-0" aria-hidden="true">{icon}</span>
+        )}
+        <span className={twMerge('truncate', loading && 'opacity-75')}>
+          {children}
+        </span>
+        {!loading && icon && iconPosition === 'right' && (
+          <span className="flex-shrink-0" aria-hidden="true">{icon}</span>
+        )}
       </button>
     );
   }
