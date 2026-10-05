@@ -1,6 +1,5 @@
 /**
- * Loader utility for AutoRename-Revived v4.0.0
- * Reusable spinner SVG component
+ * Loader utility — reusable spinner SVG component
  */
 
 import { twMerge } from 'tailwind-merge';
