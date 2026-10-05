@@ -1,5 +1,5 @@
 /**
- * File List Components - File Row
+ * Individual file row
  */
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, CheckCircle, AlertCircle, Clock, XCircle, Loader2, AlertTriangle } from 'lucide-react';

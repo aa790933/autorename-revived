@@ -1,5 +1,5 @@
 /**
- * Main App Component - AutoRename-Revived v4.0.0
+ * Main App Component
  */
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -1,6 +1,5 @@
 /**
- * Zustand store for AutoRename-Revived v4.0.0
- * Centralized state management with React integration
+ * Zustand store with subscribe middleware
  */
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';

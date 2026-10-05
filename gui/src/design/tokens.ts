@@ -1,6 +1,6 @@
 /**
- * Design Tokens for AutoRename-Revived v4.0.0
- * Centralized design system for consistent, professional UI
+ * Design tokens: color, spacing, typography, motion.
+ * Used by the UI layer — keep in sync with tailwind.config.js.
  */
 
 export const colors = {

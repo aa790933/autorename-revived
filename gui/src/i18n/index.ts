@@ -1,6 +1,5 @@
 /**
- * i18n configuration for AutoRename-Revived v4.0.0
- * Supports English, French, and Arabic with RTL support
+ * i18n config: English, French, Arabic with RTL
  */
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';

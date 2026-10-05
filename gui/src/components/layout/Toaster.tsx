@@ -1,5 +1,5 @@
 /**
- * Layout Components - Toast Notifications
+ * Toast notifications
  */
 import { useToastStore } from '@/hooks/useToast';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';

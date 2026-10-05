@@ -1,6 +1,5 @@
 /**
- * Modern Input Component - AutoRename-Revived v4.0.0
- * Accessible, typed input with proper focus states
+ * Input component
  */
 
 import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';

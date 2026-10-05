@@ -1,6 +1,5 @@
 /**
- * Modern Sidebar Navigation - AutoRename-Revived v4.0.0
- * Collapsible sidebar with language/theme controls
+ * Sidebar navigation with language/theme controls
  */
 import { useTranslation } from 'react-i18next';
 import {

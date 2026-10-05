@@ -1,6 +1,5 @@
 /**
- * Modern Toggle Component - AutoRename-Revived v4.0.0
- * Accessible switch with proper focus states
+ * Toggle / switch component
  */
 
 import { forwardRef, InputHTMLAttributes, HTMLAttributes } from 'react';
@@ -88,8 +87,6 @@ interface RadioGroupProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onChange
 }
 
 export function RadioGroup({ name, value, onChange, children, className, ...props }: RadioGroupProps) {
-  void value;
-  void onChange;
   return (
     <div role="radiogroup" aria-label={name} className={twMerge('space-y-2', className)} {...props}>
       {children}

@@ -1,6 +1,5 @@
 /**
- * Modern Button Component - AutoRename-Revived v4.0.0
- * Professional, accessible button with variants and states
+ * Button component
  */
 
 import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react';

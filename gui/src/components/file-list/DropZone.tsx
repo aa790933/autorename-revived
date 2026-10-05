@@ -1,5 +1,5 @@
 /**
- * File List Components - Drop Zone
+ * Drag-and-drop file zone
  */
 import { useTranslation } from 'react-i18next';
 import { FileText, Upload, FolderOpen } from 'lucide-react';

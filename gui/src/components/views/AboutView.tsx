@@ -1,5 +1,5 @@
 /**
- * Views - About View
+ * About view
  */
 import { useTranslation } from 'react-i18next';
 import { Github, AlertCircle, FileText, CheckCircle, Heart } from 'lucide-react';

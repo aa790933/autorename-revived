@@ -1,5 +1,5 @@
 /**
- * Toast notification system
+ * Toast notification store
  */
 import { create } from 'zustand';
 import { generateId } from '@/utils/helpers';

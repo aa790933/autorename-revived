@@ -1,5 +1,5 @@
 /**
- * Tauri API wrappers - Type-safe IPC communication with Rust backend
+ * Tauri IPC wrappers
  */
 import { invoke } from '@tauri-apps/api/core';
 import type {

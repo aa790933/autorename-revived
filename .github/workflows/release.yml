@@ -97,14 +97,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: tauri-windows-portable
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: gui/.pnpm-store
-          key: pnpm-store-${{ hashFiles('gui/package.json') }}
-          restore-keys: |
-            pnpm-store-
-      - name: Install npm deps
+      - name: Install dependencies
         shell: pwsh
         working-directory: gui
         run: pnpm install --no-frozen-lockfile --config.store-dir=.\\.pnpm-store
@@ -188,14 +181,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: tauri-windows-installer
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: gui/.pnpm-store
-          key: pnpm-store-${{ hashFiles('gui/package.json') }}
-          restore-keys: |
-            pnpm-store-
-      - name: Install npm deps
+      - name: Install dependencies
         shell: pwsh
         working-directory: gui
         run: pnpm install --no-frozen-lockfile --config.store-dir=.\\.pnpm-store

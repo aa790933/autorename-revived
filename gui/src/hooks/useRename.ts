@@ -1,5 +1,5 @@
 /**
- * Custom hook for rename operations
+ * Rename operations hook
  */
 import { useCallback } from 'react';
 import { useAppStore } from '@/store';

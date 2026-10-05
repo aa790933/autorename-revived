@@ -1,5 +1,5 @@
 /**
- * File picker service using Tauri dialog and fs plugins
+ * File picker using Tauri dialog/fs
  */
 import { open } from '@tauri-apps/plugin-dialog';
 import { readDir } from '@tauri-apps/plugin-fs';

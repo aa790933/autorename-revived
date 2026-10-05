@@ -1,5 +1,5 @@
 /**
- * Views - History View
+ * History view
  */
 import { useTranslation } from 'react-i18next';
 import { Clock, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';

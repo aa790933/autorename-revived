@@ -1,5 +1,5 @@
 /**
- * Layout Components - Main Layout Wrapper
+ * Main layout wrapper
  */
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
@@ -12,7 +12,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
       <Sidebar />
       <Header />
       <main

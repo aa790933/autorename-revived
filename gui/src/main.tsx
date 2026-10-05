@@ -1,5 +1,5 @@
 /**
- * Entry point for AutoRename-Revived v4.0.0
+ * App entry point
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -1,6 +1,5 @@
 /**
- * Modern Card Component - AutoRename-Revived v4.0.0
- * Professional card with variants and padding options
+ * Card component with variants
  */
 
 import { forwardRef, HTMLAttributes } from 'react';

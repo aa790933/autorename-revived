@@ -1,6 +1,5 @@
 /**
- * Theme Provider for AutoRename-Revived v4.0.0
- * Handles light/dark/system themes with CSS variables
+ * Theme provider with light/dark/system support
  */
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';

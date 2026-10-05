@@ -1,5 +1,5 @@
 /**
- * Layout Components - Header / Title Bar
+ * Header / title bar
  */
 import { useTranslation } from 'react-i18next';
 import { Minimize, Maximize, X, Menu, Sun, Moon, Monitor } from 'lucide-react';
@@ -40,8 +40,8 @@ export function Header() {
   return (
     <header
       className={`
-        fixed top-0 right-0 z-30 h-12 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm 
-        border-b border-gray-200 dark:border-gray-700
+        fixed top-0 right-0 z-30 h-12 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm
+        border-b border-neutral-200 dark:border-neutral-800
         flex items-center px-4
         ${sidebarOpen ? 'left-64' : 'left-16'}
         transition-all duration-300
@@ -59,10 +59,10 @@ export function Header() {
             aria-label={sidebarOpen ? t('accessibility.closeMenu') : t('accessibility.openMenu')}
             className="hidden sm:flex"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-5 h-5" aria-hidden="true" />
           </Button>
-          
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white hidden sm:block">
+
+          <h1 className="text-lg font-semibold text-neutral-900 dark:text-white hidden sm:block">
             {view === 'files' && t('files.title')}
             {view === 'settings' && t('settings.title')}
             {view === 'history' && t('history.title')}
@@ -73,7 +73,7 @@ export function Header() {
         {/* Right side - Theme toggle and window controls */}
         <div className="flex items-center gap-2">
           {/* Theme Toggle */}
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg p-1">
             {[
               { value: 'light', icon: Sun },
               { value: 'dark', icon: Moon },
@@ -85,14 +85,14 @@ export function Header() {
                 className={`
                   p-1.5 rounded transition-colors
                   ${theme === value
-                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    ? 'bg-white dark:bg-neutral-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                    : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
                   }
                 `}
                 aria-label={t(`common.${value}`)}
                 aria-pressed={theme === value}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4" aria-hidden="true" />
               </button>
             ))}
           </div>
@@ -106,7 +106,7 @@ export function Header() {
               aria-label="Minimize"
               className="w-8 h-8 p-0"
             >
-              <Minimize className="w-4 h-4" />
+              <Minimize className="w-4 h-4" aria-hidden="true" />
             </Button>
             <Button
               variant="ghost"
@@ -115,16 +115,16 @@ export function Header() {
               aria-label="Maximize"
               className="w-8 h-8 p-0"
             >
-              <Maximize className="w-4 h-4" />
+              <Maximize className="w-4 h-4" aria-hidden="true" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleClose}
               aria-label="Close"
-              className="w-8 h-8 p-0 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              className="w-8 h-8 p-0 text-neutral-500 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </Button>
           </div>
         </div>

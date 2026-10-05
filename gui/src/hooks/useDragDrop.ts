@@ -1,5 +1,5 @@
 /**
- * Drag and drop hook for file handling
+ * Drag and drop hook
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';

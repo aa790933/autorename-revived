@@ -1,5 +1,5 @@
 /**
- * Settings Components - Settings Form
+ * Settings form
  */
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
