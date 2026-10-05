@@ -1,5 +1,5 @@
 /**
- * Loader utility — reusable spinner SVG component
+ * Loader utility - reusable spinner SVG component
  */
 
 import { twMerge } from 'tailwind-merge';
