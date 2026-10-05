@@ -233,7 +233,7 @@ jobs:
   release:
     name: Create Draft Release
     needs: [build-gui-portable, build-gui-installer]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
