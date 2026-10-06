@@ -215,6 +215,7 @@
       <a href="#" class="logo">AutoRename-Revived</a>
       <div class="links">
         <a href="#features">Features</a>
+        <a href="#naming">Naming</a>
         <a href="#how">How it works</a>
         <a href="#usage">Usage</a>
         <a href="https://github.com/aa790933/autorename-revived" target="_blank" rel="noopener">GitHub</a>
@@ -225,7 +226,7 @@
   <!-- Hero -->
   <section class="container hero">
     <h1>AI-Powered Batch Document Renamer</h1>
-    <p class="sub">Drop PDFs, images, DOCX, XLSX and PPTX. AI reads each one and renames it with the company, date, type and subject it finds inside.</p>
+    <p class="sub">Drop a folder of PDFs, scans and Office files. Each one comes back named with the company, date, type and subject inside it.</p>
     <div class="actions">
       <a href="#usage" class="btn btn-primary">Download Portable</a>
       <a href="https://github.com/aa790933/autorename-revived" target="_blank" rel="noopener" class="btn btn-ghost">View on GitHub</a>
@@ -243,13 +244,13 @@
     <div class="container">
       <div style="text-align:center; max-width: 48ch; margin: 0 auto 3rem;">
         <h2 style="font-size:2rem; font-weight:600; letter-spacing:-0.01em;">Rename documents in seconds</h2>
-        <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; line-height:1.6;">No Python runtime. No cloud accounts. Local extraction with optional AI vision for scanned documents.</p>
+        <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; line-height:1.6;">Reads PDF, DOCX, XLSX, PPTX, TXT and images. Text extraction runs locally; vision AI is only used when the text layer is poor.</p>
       </div>
       <div class="card-grid">
         <div class="card">
           <div style="font-family:var(--font-mono); font-size:0.6875rem; font-weight:500; text-transform:uppercase; color:var(--muted-light); margin-bottom:0.5rem;">Native</div>
           <h3 style="font-size:1.125rem; font-weight:600; margin-bottom:0.375rem;">Rust + Tauri Backend</h3>
-          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">Zero-install standalone EXE with portable settings.</p>
+          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">One EXE, no installer needed. Settings travel with the file.</p>
         </div>
         <div class="card">
           <div style="font-family:var(--font-mono); font-size:0.6875rem; font-weight:500; text-transform:uppercase; color:var(--muted-light); margin-bottom:0.5rem;">AI</div>
@@ -259,17 +260,17 @@
         <div class="card">
           <div style="font-family:var(--font-mono); font-size:0.6875rem; font-weight:500; text-transform:uppercase; color:var(--muted-light); margin-bottom:0.5rem;">Vision</div>
           <h3 style="font-size:1.125rem; font-weight:600; margin-bottom:0.375rem;">Vision Mode</h3>
-          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">Scanned PDFs and images via Vision LLMs with quality fallback.</p>
+          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">Scanned pages with no text layer go to a vision model. Text quality decides automatically.</p>
         </div>
         <div class="card">
           <div style="font-family:var(--font-mono); font-size:0.6875rem; font-weight:500; text-transform:uppercase; color:var(--muted-light); margin-bottom:0.5rem;">i18n</div>
           <h3 style="font-size:1.125rem; font-weight:600; margin-bottom:0.375rem;">Internationalization</h3>
-          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">English, French, Arabic with full RTL support.</p>
+          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">English, French, Arabic. Arabic flips the layout to right-to-left.</p>
         </div>
         <div class="card">
           <div style="font-family:var(--font-mono); font-size:0.6875rem; font-weight:500; text-transform:uppercase; color:var(--muted-light); margin-bottom:0.5rem;">Safety</div>
           <h3 style="font-size:1.125rem; font-weight:600; margin-bottom:0.375rem;">Undo &amp; Dry Run</h3>
-          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">Preview proposed names before writing. Undo last batch.</p>
+          <p style="color:var(--muted); font-size:0.875rem; line-height:1.6;">Dry Run shows every new name first. Undo reverses a batch, one click.</p>
         </div>
         <div class="card">
           <div style="font-family:var(--font-mono); font-size:0.6875rem; font-weight:500; text-transform:uppercase; color:var(--muted-light); margin-bottom:0.5rem;">Deploy</div>
@@ -284,7 +285,7 @@
   <section id="how" class="section section">
     <div class="container" style="text-align:center;">
       <h2 style="font-size:2rem; font-weight:600; letter-spacing:-0.01em;">Three steps</h2>
-      <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; max-width: 40ch; margin-left: auto; margin-right: auto;">Drag your files. AI reads them. Names are written back.</p>
+      <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; max-width: 40ch; margin-left: auto; margin-right: auto;">Drop files. Each one is read, parsed, and renamed. Collisions get a sequence number.</p>
       <div class="pipeline">
         <div class="pipeline-step">
           <div>
@@ -308,12 +309,28 @@
     </div>
   </section>
 
+  <!-- Naming demo -->
+  <section id="naming" class="section">
+    <div class="container">
+      <div style="max-width: 64ch; margin: 0 auto; text-align:center;">
+        <h2 style="font-size:2rem; font-weight:600; letter-spacing:-0.01em;">What a rename looks like</h2>
+        <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; line-height:1.6;">The template <code style="font-family:var(--font-mono); font-size:0.875em; background:var(--surface); padding:0.1em 0.35em; border-radius:var(--radius-sm);">{date}_{doctype}_{company}_{subject}</code> turns a scanner default into a name you can find later.</p>
+      </div>
+      <div class="code-block" style="max-width:52ch; margin-left:auto; margin-right:auto;">
+        <span class="str">scan_001.pdf</span><br>
+        <span class="fn">&darr;</span><br>
+        <span class="str">20240115_Invoice_AcmeCorp_Q3_Report_01.pdf</span>
+      </div>
+      <p style="text-align:center; color:var(--muted-light); font-size:0.8125rem; margin-top:1rem;">Placeholders: {date} {company} {doctype} {subject} {original} {sequence} {separator}</p>
+    </div>
+  </section>
+
   <!-- Usage -->
   <section id="usage" class="section">
     <div class="container">
       <div style="max-width: 64ch; margin: 0 auto; text-align:center;">
         <h2 style="font-size:2rem; font-weight:600; letter-spacing:-0.01em;">Quick start</h2>
-        <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; line-height:1.6;">Rust toolchain, Node.js 20+, pnpm 9. One command builds the standalone EXE.</p>
+        <p style="color:var(--muted); margin-top:0.75rem; font-size:1rem; line-height:1.6;">Grab a release build, or compile it yourself: Rust toolchain, Node.js 20+, pnpm 9.</p>
       </div>
       <div class="code-block">
         <span class="kw">cd</span> gui && pnpm install<br>
