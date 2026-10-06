@@ -153,7 +153,7 @@ impl UndoHistory {
 
     /// Append one rename to the given batch, creating the batch when needed.
     /// Callers in a pipeline keep the history in memory and save once at the
-    /// end — rewriting the log per renamed file is O(files x log size).
+    /// end , rewriting the log per renamed file is O(files x log size).
     pub fn add_entry(&mut self, batch_id: &str, old_path: &str, new_path: &str) {
         let timestamp = chrono::Local::now().to_rfc3339();
         let entry = UndoEntry {
@@ -198,7 +198,7 @@ pub fn sanitize_filename(name: &str, max_length: usize) -> String {
         return String::from("_");
     }
 
-    // Compiled once per process instead of per call — this runs for every
+    // Compiled once per process instead of per call , this runs for every
     // field of every file in a batch.
     static INVALID_FS_CHARS: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static UNICODE_CONTROL: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -368,7 +368,7 @@ pub fn validate_metadata(
     }
 
     if company.is_empty() && doctype.is_empty() && date_str.is_empty() {
-        warnings.push("AI returned no usable metadata — using defaults".to_string());
+        warnings.push("AI returned no usable metadata , using defaults".to_string());
         is_error = true;
     }
 
@@ -379,13 +379,13 @@ pub fn validate_metadata(
             ISO_DATE.get_or_init(|| Regex::new(r#"^\d{4}-\d{2}-\d{2}$"#).unwrap());
         if !date_re.is_match(date_str) {
             warnings.push(format!(
-                "Invalid date format '{}' — expected YYYY-MM-DD",
+                "Invalid date format '{}' , expected YYYY-MM-DD",
                 date_str
             ));
         }
     }
 
-    // Validate subject length (characters, not bytes — "Ürün Özet…" is
+    // Validate subject length (characters, not bytes , "Ürün Özet…" is
     // multi-byte in UTF-8). This mirrors the truncation applied when the
     // filename is rendered, so the warning and the output agree.
     let subject_chars = subject.chars().count();
@@ -491,7 +491,7 @@ pub fn generate_filename(
 
     let mut result = render_template(template, &fields, &separator);
 
-    // Fall back when the template produced nothing usable — no placeholders at
+    // Fall back when the template produced nothing usable , no placeholders at
     // all, a placeholder that does not exist, or a value that sanitized away
     // to nothing.
     if result.trim().is_empty() || has_unresolved_placeholder(&result) {
@@ -542,7 +542,7 @@ pub fn generate_filename(
 
     // Reserve room for the extension. If the rendered name is too long, the
     // stem must be truncated down to `max_length - suffix` so the *final*
-    // file name (stem + extension) fits the limit and keeps its extension —
+    // file name (stem + extension) fits the limit and keeps its extension ,
     // Windows routing/formatting depends on the extension being present.
     let avail = config.max_length as usize;
     if suffix.is_empty() {
@@ -622,7 +622,7 @@ fn format_date(iso: &str, fmt: &str) -> String {
 /// Substitute `{placeholder}` tokens segment by segment.
 ///
 /// The template is split on the configured separator *before* substitution, so
-/// only segments whose placeholders all resolved to empty are dropped — values
+/// only segments whose placeholders all resolved to empty are dropped , values
 /// that legitimately contain the separator are preserved and the result never
 /// carries doubled separators.
 ///
@@ -660,7 +660,7 @@ fn render_template(template: &str, fields: &HashMap<String, String>, separator: 
 /// first free zero-padded counter (`_01`, `_02`, …). Without the token, a
 /// counter is appended to the stem.
 ///
-/// Returns an error when every candidate up to [`MAX_SEQUENCE`] is taken — the
+/// Returns an error when every candidate up to [`MAX_SEQUENCE`] is taken , the
 /// alternative would be handing back a name that already exists on disk.
 pub fn ensure_unique_filename(
     directory: &str,
@@ -751,7 +751,7 @@ pub fn undo_last_rename(history_path: &Path, batch_id: &str) -> Result<UndoResul
     // Reverse order: the last rename applied is the first unwound.
     for entry in entries.iter().rev() {
         if !Path::new(&entry.new_path).exists() {
-            // File moved/deleted by the user — leave the rest of the batch
+            // File moved/deleted by the user , leave the rest of the batch
             // intact but report this one as failed.
             failed += 1;
             files.push(UndoFileResult {

@@ -2,7 +2,7 @@
 name = "autorename-revived-gui"
 version = "4.0.0"
 edition = "2021"
-description = "AI-powered batch document renamer (Tauri v2 desktop app) — world-class v4.0.0"
+description = "AI-powered batch document renamer (Tauri v2 desktop app)"
 license = "MIT"
 rust-version = "1.77"
 authors = ["AutoRename-Revived Contributors"]

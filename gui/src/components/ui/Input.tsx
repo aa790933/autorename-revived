@@ -2,7 +2,7 @@
  * Input component
  */
 
-import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';
+import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, ReactNode } from 'react';
 import { twMerge } from 'tailwind-merge';
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
@@ -11,10 +11,12 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChan
   hint?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  leftIcon?: ReactNode;
+  rightElement?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, hint, id, value, onChange, ...props }, ref) => {
+  ({ className, label, error, hint, id, value, onChange, leftIcon, rightElement, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
     return (
@@ -24,24 +26,34 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {label}
           </label>
         )}
-        <input
-          ref={ref}
-          id={inputId}
-          value={value}
-          onChange={onChange}
-          className={twMerge(
-            'w-full px-3 py-2 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
-            'border-neutral-300 dark:border-neutral-600',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            'placeholder:text-neutral-400 dark:placeholder:text-neutral-500',
-            error && 'border-danger-500 focus-visible:ring-danger-500',
-            className
+        <div className="relative">
+          {leftIcon && (
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" aria-hidden="true">{leftIcon}</span>
           )}
-          aria-invalid={error ? 'true' : 'false'}
-          aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
-          {...props}
-        />
+          <input
+            ref={ref}
+            id={inputId}
+            value={value}
+            onChange={onChange}
+            className={twMerge(
+              'w-full px-3 py-2 rounded-lg border bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100',
+              'border-neutral-300 dark:border-neutral-600',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              'placeholder:text-neutral-400 dark:placeholder:text-neutral-500',
+              leftIcon && 'pl-10',
+              rightElement && 'pr-10',
+              error && 'border-danger-500 focus-visible:ring-danger-500',
+              className
+            )}
+            aria-invalid={error ? 'true' : 'false'}
+            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
+            {...props}
+          />
+          {rightElement && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400" aria-hidden="true">{rightElement}</span>
+          )}
+        </div>
         {error && (
           <p id={`${inputId}-error`} className="mt-1 text-sm text-danger-600 dark:text-danger-400" role="alert">
             {error}

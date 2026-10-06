@@ -1,6 +1,6 @@
 <div align="center">
   <h1>AutoRename-Revived v4.0.0</h1>
-   <p><b>AI-powered batch document renamer — native Rust + Tauri v2 backend with React + TypeScript frontend and multi-provider LLM support.</b></p>
+   <p><b>AI-powered batch document renamer , native Rust + Tauri v2 backend with React + TypeScript frontend and multi-provider LLM support.</b></p>
   <p>
     <img src="https://img.shields.io/badge/rust-2021-orange?logo=rust" alt="Rust">
     <img src="https://img.shields.io/badge/tauri-v2-blue?logo=tauri" alt="Tauri">
@@ -12,9 +12,9 @@
   </p>
 </div>
 
-AutoRename-Revived extracts **company name**, **document date**, **document type**, **category**, and **subject** from documents (PDF, images, DOCX, XLSX, PPTX) using AI, then renames them to a consistent, customizable format — batch processing hundreds of files in seconds.
+AutoRename-Revived extracts **company name**, **document date**, **document type**, **category**, and **subject** from documents (PDF, images, DOCX, XLSX, PPTX) using AI, then renames them to a consistent, customizable format , batch processing hundreds of files in seconds.
 
-Built with **Tauri v2** (Rust backend + React/TypeScript frontend) for ultra-fast performance — no Python runtime required.
+Built with **Tauri v2** (Rust backend + React/TypeScript frontend) for ultra-fast performance , no Python runtime required.
 
 ---
 
@@ -39,13 +39,13 @@ Built with **Tauri v2** (Rust backend + React/TypeScript frontend) for ultra-fas
 
 Download the [latest release](https://github.com/aa790933/autorename-revived/releases) and run `AutoRename-Revived.exe`:
 
-1. **Configure AI** — Open Settings, select a provider, and enter your API key
-2. **Test Connection** — Click "Test Connection" to verify your key works
-3. **Drag & Drop** — Drop PDF files or folders onto the window
-4. **Preview** — Click **Dry Run** to preview proposed names without writing
-5. **Rename** — Click **Rename** to apply changes
-6. **Undo** — Click **Undo** to reverse the last batch
-7. **Cancel** — Click **Cancel** during a long run to stop processing
+1. **Configure AI** , Open Settings, select a provider, and enter your API key
+2. **Test Connection** , Click "Test Connection" to verify your key works
+3. **Drag & Drop** , Drop PDF files or folders onto the window
+4. **Preview** , Click **Dry Run** to preview proposed names without writing
+5. **Rename** , Click **Rename** to apply changes
+6. **Undo** , Click **Undo** to reverse the last batch
+7. **Cancel** , Click **Cancel** during a long run to stop processing
 
 ---
 
@@ -153,7 +153,7 @@ OPENAI_API_KEY=sk-your-openai-key-here
 
 - **Settings location**: Stored alongside the EXE as `settings.json`
 - **Marker**: A `.portable` file next to the EXE enables portable mode
-- **Portability**: Copy the folder to any machine — settings travel with you
+- **Portability**: Copy the folder to any machine , settings travel with you
 
 ```
 Folder/
@@ -286,4 +286,4 @@ The frontend communicates with the Rust backend via Tauri IPC commands:
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT , see [LICENSE](LICENSE)

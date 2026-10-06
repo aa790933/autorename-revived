@@ -4,7 +4,7 @@ use tauri::Manager;
 /// Returns true if the app is running in portable mode.
 ///
 /// Portable mode is detected by the presence of a `.portable` marker file
-/// in the same directory as the executable. This file can be empty — its
+/// in the same directory as the executable. This file can be empty , its
 /// mere existence signals that settings should be stored alongside the
 /// executable rather than in the OS application-data directory.
 pub fn is_portable() -> bool {

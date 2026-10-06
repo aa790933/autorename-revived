@@ -279,7 +279,7 @@ fn parse_json_response(text: &str) -> Result<HashMap<String, serde_json::Value>,
 
 /// Truncate to `max` *characters* (not bytes). The slicing form
 /// `&s[..s.len().min(max)]` panics when `max` lands inside a multi-byte
-/// UTF-8 sequence — which this app hits constantly, since AI responses echo
+/// UTF-8 sequence , which this app hits constantly, since AI responses echo
 /// Arabic, Hindi and Cyrillic document text.
 fn truncate_str_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
@@ -313,11 +313,11 @@ fn parse_gemini_response(text_resp: &str) -> Result<String, String> {
     }
 
     let candidates = json["candidates"].as_array().ok_or(
-        "No candidates in response — the model may not exist or the request failed",
+        "No candidates in response , the model may not exist or the request failed",
     )?;
     if candidates.is_empty() {
         return Err(
-            "Empty candidates array in response — the model may have refused the request or content was filtered"
+            "Empty candidates array in response , the model may have refused the request or content was filtered"
                 .to_string(),
         );
     }
@@ -573,7 +573,7 @@ pub async fn extract_metadata_text_multi(
                     return Vec::new();
                 }
                 tracing::warn!(
-                    "AI text extraction failed for suggestion language '{}': {} — inserting placeholder",
+                    "AI text extraction failed for suggestion language '{}': {} , inserting placeholder",
                     lang,
                     e
                 );
@@ -620,7 +620,7 @@ pub async fn extract_metadata_vision_multi(
                     return Vec::new();
                 }
                 tracing::warn!(
-                    "AI vision extraction failed for suggestion language '{}': {} — inserting placeholder",
+                    "AI vision extraction failed for suggestion language '{}': {} , inserting placeholder",
                     lang,
                     e
                 );
@@ -653,13 +653,15 @@ pub async fn extract_metadata_text(
     );
 
     let sys_prompt = build_system_prompt(language, &config.effective_system_prompt());
-    let result = match provider {
-        "gemini" => gemini_text_extract(text, config, &sys_prompt).await,
-        "openai" => openai_text_extract(text, config, &sys_prompt).await,
-        "anthropic" => anthropic_text_extract(text, config, &sys_prompt).await,
-        "ollama" | "xai" | "custom" => openai_compat_text_extract(text, config, &sys_prompt).await,
-        other => Err(format!("Unknown provider: {}", other)),
-    };
+    let result = retry_async(|| async {
+        match provider {
+            "gemini" => gemini_text_extract(text, config, &sys_prompt).await,
+            "openai" => openai_text_extract(text, config, &sys_prompt).await,
+            "anthropic" => anthropic_text_extract(text, config, &sys_prompt).await,
+            "ollama" | "xai" | "custom" => openai_compat_text_extract(text, config, &sys_prompt).await,
+            other => Err(format!("Unknown provider: {other}")),
+        }
+    }).await;
 
     info!("AI text extraction completed in {:?}", start.elapsed());
     result
@@ -681,20 +683,44 @@ pub async fn extract_metadata_vision(
 
     let sys_prompt = build_system_prompt(language, &config.effective_system_prompt());
     let user_prompt = build_vision_user_prompt(language);
-    let result = match provider {
-        "gemini" => gemini_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
-        "openai" => openai_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
-        "anthropic" => {
-            anthropic_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await
+    let result = retry_async(|| async {
+        match provider {
+            "gemini" => gemini_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
+            "openai" => openai_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await,
+            "anthropic" => { anthropic_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await }
+            "ollama" | "xai" | "custom" => { openai_compat_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await }
+            other => Err(format!("Unknown provider: {other}")),
         }
-        "ollama" | "xai" | "custom" => {
-            openai_compat_vision_extract(file_buffers, config, &sys_prompt, &user_prompt).await
-        }
-        other => Err(format!("Unknown provider: {}", other)),
-    };
+    }).await;
 
     info!("AI vision extraction completed in {:?}", start.elapsed());
     result
+}
+
+/// Retry an async operation up to `MAX_RETRIES` times with exponential backoff.
+/// Returns the first successful result, or the last error.
+async fn retry_async<F, Fut, T, E>(mut action: F) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+{
+    const MAX_RETRIES: u32 = 2;
+    const BASE_MS: u64 = 500;
+
+    let mut last_err = None;
+    for attempt in 0..=MAX_RETRIES {
+        match action().await {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < MAX_RETRIES {
+                    let delay = BASE_MS * 2u64.pow(attempt);
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap())
 }
 
 pub fn get_model_name(config: &AiConfig) -> String {
@@ -1016,7 +1042,7 @@ async fn openai_vision_extract(
 ///
 /// Reasoning-capable models (and several OpenAI-compatible servers) may return
 /// a null or empty `content` with the real answer in `reasoning_content`, or
-/// split it across an array of content parts — both shapes are handled here
+/// split it across an array of content parts , both shapes are handled here
 /// instead of failing the whole document.
 fn openai_compat_message_text(json: &serde_json::Value) -> Result<&str, String> {
     let choices = json["choices"]
@@ -1024,7 +1050,7 @@ fn openai_compat_message_text(json: &serde_json::Value) -> Result<&str, String> 
         .ok_or("No choices in response")?;
     if choices.is_empty() {
         return Err(
-            "Empty choices array in response — the API may have refused the request or content was filtered"
+            "Empty choices array in response , the API may have refused the request or content was filtered"
                 .to_string(),
         );
     }
@@ -1101,7 +1127,7 @@ async fn anthropic_text_extract(
         .ok_or("No content array in response")?;
     if content_arr.is_empty() {
         return Err(
-            "Empty content array in response — the API may have refused the request or content was filtered"
+            "Empty content array in response , the API may have refused the request or content was filtered"
                 .to_string(),
         );
     }
@@ -1195,7 +1221,7 @@ async fn anthropic_vision_extract(
         .ok_or("No content array in response")?;
     if content_arr.is_empty() {
         return Err(
-            "Empty content array in response — the API may have refused the request or content was filtered"
+            "Empty content array in response , the API may have refused the request or content was filtered"
                 .to_string(),
         );
     }
@@ -1381,8 +1407,8 @@ fn extract_str_field_any(
 /// Probe the configured provider endpoint with the given credentials.
 ///
 /// Uses the live base-URL resolution of the extraction path (so overrides in
-/// `AiConfig` are honored) and always contacts the endpoint — including the
-/// `custom` provider — so a successful test means the endpoint actually
+/// `AiConfig` are honored) and always contacts the endpoint , including the
+/// `custom` provider , so a successful test means the endpoint actually
 /// accepted the key.
 pub async fn test_connection(config: &AiConfig) -> TestConnectionResult {
     let start = Instant::now();
@@ -1668,7 +1694,7 @@ async fn test_custom_connection(
                     .collect::<String>();
                 failure_result(
                     "custom",
-                    format!("Endpoint returned {} — {}", status, detail),
+                    format!("Endpoint returned {} , {}", status, detail),
                     start,
                 )
             }

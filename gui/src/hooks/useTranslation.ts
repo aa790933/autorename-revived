@@ -12,7 +12,7 @@ export function useTranslation(namespace?: string) {
   const { t, i18n } = useI18nTranslation(namespace);
 
   // Sync language with store (if changed externally)
-  // Note: react-i18next handles this automatically via LanguageDetector
+  // react-i18next handles this automatically via LanguageDetector,
 
   return { t, i18n, currentLanguage: language };
 }

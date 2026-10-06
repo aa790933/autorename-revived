@@ -6,7 +6,7 @@ mod portable;
 
 use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
 use config::{
-    AppConfig, ConfigBatchResult, NamingConfig, load_config, save_config, save_config_batch,
+    AppConfig, BackupConfig, ConfigBatchResult, NamingConfig, load_config, save_config, save_config_batch,
 };
 use document::{BatchResult, FileResult, UndoHistory, UndoResult, resolve_safe_path};
 use serde::{Deserialize, Serialize};
@@ -119,12 +119,17 @@ async fn save_app_config_batch(
     save_config_batch(app, pairs).await
 }
 
-#[tauri::command]
-async fn test_connection(
-    app: tauri::AppHandle,
+#[derive(Debug, Deserialize, Serialize)]
+struct TestConnectionRequest {
     provider: Option<String>,
     api_key: Option<String>,
     model: Option<String>,
+}
+
+#[tauri::command]
+async fn test_connection(
+    app: tauri::AppHandle,
+    request: TestConnectionRequest,
 ) -> TestConnectionResult {
     // Start from the *saved* configuration so the probe exercises the real
     // base URLs / model wiring, then apply the live UI overrides.
@@ -132,13 +137,13 @@ async fn test_connection(
         Ok(cfg) => cfg.ai,
         Err(_) => AiConfig::default(),
     };
-    if let Some(p) = provider.filter(|p| !p.trim().is_empty()) {
+    if let Some(p) = request.provider.filter(|p| !p.trim().is_empty()) {
         config.provider = p;
     }
-    if let Some(k) = api_key.filter(|k| !k.trim().is_empty()) {
+    if let Some(k) = request.api_key.filter(|k| !k.trim().is_empty()) {
         config.api_key = k;
     }
-    if let Some(m) = model.filter(|m| !m.trim().is_empty()) {
+    if let Some(m) = request.model.filter(|m| !m.trim().is_empty()) {
         match config.provider.as_str() {
             "gemini" => config.gemini_model = m,
             "openai" | "anthropic" => config.model = m,
@@ -205,7 +210,7 @@ fn with_extension(mut name: String, ext: &str) -> String {
     name
 }
 
-/// Refuse to read files that would exhaust memory (or hang extraction) —
+/// Refuse to read files that would exhaust memory (or hang extraction) ,
 /// documents that big are not the target of this tool anyway.
 const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024;
 
@@ -264,7 +269,7 @@ impl Pipeline {
         if !extractors::is_supported_extension(&path) {
             return Err(failed_file_result(
                 &path,
-                "Unsupported file type — only images, text, Office documents and PDFs are renamed"
+                "Unsupported file type , only images, text, Office documents and PDFs are renamed"
                     .to_string(),
             ));
         }
@@ -303,14 +308,14 @@ impl Pipeline {
         }
 
         // An empty Vec means the primary extraction failed outright (API
-        // error, vision disabled…) — fail the file instead of renaming it to
+        // error, vision disabled…) , fail the file instead of renaming it to
         // a bogus name built from empty metadata. The multi-language helpers
         // guarantee index alignment, so index 0 is always the primary result.
         if all_metadata.is_empty() {
             return Err(failed_file_result(
                 &path,
                 format!(
-                    "AI metadata extraction failed for {} — check your API key, model name, vision setting, and provider configuration.",
+                    "AI metadata extraction failed for {} , check your API key, model name, vision setting, and provider configuration.",
                     path
                 ),
             ));
@@ -331,7 +336,7 @@ impl Pipeline {
         let mut warnings = meta_warnings;
         if meta_is_error {
             warnings.push(format!(
-                "AI metadata extraction failed for {} — company='{}', doctype='{}', date='{}', subject='{}', unreadable={}. Check your API key, model name, and provider settings.",
+                "AI metadata extraction failed for {} , company='{}', doctype='{}', date='{}', subject='{}', unreadable={}. Check your API key, model name, and provider settings.",
                 path,
                 &primary_meta.company_name,
                 &primary_meta.document_type,
@@ -359,7 +364,7 @@ impl Pipeline {
 
         // Suggestions: index i of `all_metadata` (i >= 1) corresponds to
         // `naming.suggestion_languages[i - 1]`. Carry both the name and its
-        // language label together — the previous version collected names
+        // language label together , the previous version collected names
         // while returning the *full* configured language list, so labels
         // misaligned whenever a suggestion was dropped.
         let mut suggestion_names = Vec::new();
@@ -414,7 +419,7 @@ impl Pipeline {
     async fn extract(&self, path: &str, file_bytes: &[u8]) -> Vec<DocumentMetadata> {
         if extractors::is_image_extension(path) {
             // Images have no text layer: vision is the only way in. With
-            // vision disabled the file cannot be processed — say so instead
+            // vision disabled the file cannot be processed , say so instead
             // of calling an AI that will be misconfigured for images.
             if !self.vision_allowed() {
                 tracing::warn!(
@@ -477,7 +482,7 @@ impl Pipeline {
             Ok(inner) => inner,
             Err(join_err) => {
                 tracing::warn!(
-                    "spawn_blocking failed for {}: {} — falling back to vision AI",
+                    "spawn_blocking failed for {}: {} , falling back to vision AI",
                     path,
                     join_err
                 );
@@ -522,7 +527,7 @@ impl Pipeline {
                     ai::extract_metadata_text_multi(&text, &self.ai_config, &self.languages).await
                 } else if vision_mode_ok {
                     tracing::info!(
-                        "Text quality {:.2} below threshold {:.2} — using vision AI for {}",
+                        "Text quality {:.2} below threshold {:.2} , using vision AI for {}",
                         quality,
                         self.text_quality_threshold,
                         path
@@ -793,7 +798,7 @@ async fn rename_files(
             let pipeline = Arc::clone(&pipeline);
             inflight.spawn(async move {
                 // Catch a panic inside the analysis of *one* file so the batch
-                // keeps going and the offending path is still reported — the
+                // keeps going and the offending path is still reported , the
                 // previous version lost the index with the panicked task and
                 // only produced a generic "failed unexpectedly".
                 let worker_path = path.clone();
@@ -852,7 +857,7 @@ async fn rename_files(
     result.success = result.failed == 0;
 
     // One history rewrite per batch (the old code reloaded and rewrote the
-    // whole JSON log after every renamed file — O(files * log size)).
+    // whole JSON log after every renamed file , O(files * log size)).
     if let Some(path) = &history_path {
         if history
             .batches
@@ -933,7 +938,7 @@ async fn validate_config(app: tauri::AppHandle) -> Result<serde_json::Value, Str
     let has_key = match config.ai.provider.as_str() {
         "gemini" | "openai" | "anthropic" | "xai" => !config.ai.api_key.trim().is_empty(),
         // Ollama needs no key; custom endpoints may be key-less (e.g. local
-        // vLLM) — the base URL is the required piece there.
+        // vLLM) , the base URL is the required piece there.
         "ollama" | "custom" => true,
         _ => false,
     };

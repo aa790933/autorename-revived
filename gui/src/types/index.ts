@@ -85,9 +85,15 @@ export interface AppConfig {
   document: DocumentConfig;
   naming: NamingConfig;
   undo: UndoConfig;
+  backup: BackupConfig;
   debug: boolean;
   max_workers: number;
   harmonized_companies: Record<string, unknown>[];
+}
+
+export interface BackupConfig {
+  keep: number;
+  dir: string;
 }
 
 export interface AiConfig {

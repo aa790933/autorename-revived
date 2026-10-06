@@ -2,6 +2,7 @@
  * Main layout wrapper
  */
 import { ReactNode } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Toaster } from './Toaster';
@@ -19,13 +20,12 @@ export function Layout({ children }: LayoutProps) {
       <Sidebar />
       <Header />
       <main
-        className={`
-          pt-12 min-h-screen transition-all duration-300
-          lg:pl-64
-        `}
-        style={{ marginLeft: sidebarOpen ? '16rem' : '4rem' }}
+        className={twMerge(
+          'pt-12 min-h-screen transition-all duration-300 ease-in-out',
+          sidebarOpen ? 'pl-64' : 'pl-16'
+        )}
       >
-        <div className="p-4 lg:p-6">
+        <div className="p-4 lg:p-6 max-w-full">
           {children}
         </div>
       </main>

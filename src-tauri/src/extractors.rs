@@ -46,6 +46,48 @@ pub fn is_pdf_extension(path: &str) -> bool {
     ext == "pdf"
 }
 
+// File-signature magic bytes for corrupt-file detection.
+const PDF_MAGIC: &[u8] = b"%PDF";
+const ZIP_MAGIC: &[u8] = &[0x50, 0x4B, 0x03, 0x04]; // "PK\x03\x04"
+const PNG_MAGIC: &[u8] = &[0x89, 0x50, 0x4E, 0x47];
+const JPEG_MAGIC: &[u8] = &[0xFF, 0xD8, 0xFF];
+const GIF_MAGIC: &[u8] = b"GIF8";
+const BMP_MAGIC: &[u8] = b"BM";
+const RIFF_MAGIC: &[u8] = b"RIFF"; // WebP
+
+/// Minimum bytes to read for signature checks.
+const SIGNATURE_LEN: usize = 12;
+
+/// Check the file's magic bytes against its declared extension.
+/// Returns an error describing the mismatch (corrupt file).
+pub fn verify_file_signature(path: &str, bytes: &[u8]) -> Result<(), String> {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    if bytes.len() < SIGNATURE_LEN {
+        return Err("File too small to verify".to_string());
+    }
+    let valid = match ext.as_str() {
+        "pdf" => bytes.starts_with(PDF_MAGIC),
+        "docx" | "xlsx" | "pptx" | "pptm" | "odt" | "ods" | "odp" => bytes.starts_with(ZIP_MAGIC),
+        "png" => bytes.starts_with(PNG_MAGIC),
+        "jpg" | "jpeg" => bytes.starts_with(JPEG_MAGIC),
+        "gif" => bytes.starts_with(GIF_MAGIC),
+        "bmp" => bytes.starts_with(BMP_MAGIC),
+        "webp" => bytes.starts_with(RIFF_MAGIC),
+        _ => true, // no signature check for text/other types
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(format!(
+            "File signature does not match .{} , file may be corrupt",
+            ext
+        ))
+    }
+}
+
 /// Canonical list of handled extensions (no dot), derived from the sets the
 /// extractors actually understand. The front end must stay in sync with this
 /// list; `get_supported_extensions_list` exposes it over IPC.
@@ -328,7 +370,7 @@ pub fn extract_text_from_pptx(bytes: &[u8]) -> Result<String, String> {
 ///
 /// Each `<si>` is exactly one cell string; rich-text entries split the string
 /// across several `<t>` runs that must be concatenated. Empty entries are
-/// kept (as `""`) because worksheet cells reference strings by *index* — a
+/// kept (as `""`) because worksheet cells reference strings by *index* , a
 /// skipped `<si>` would shift every later cell's text onto the wrong string.
 fn extract_shared_strings(xml: &str) -> Vec<String> {
     let mut strings = Vec::new();
@@ -546,7 +588,7 @@ pub fn extract_text_from_pdf(bytes: &[u8]) -> Result<String, String> {
     let page_count = doc.get_pages().len();
     if page_count > MAX_PDF_PAGES {
         tracing::warn!(
-            "PDF has {} pages — extracting text from the first {} only",
+            "PDF has {} pages , extracting text from the first {} only",
             page_count,
             MAX_PDF_PAGES
         );
@@ -577,7 +619,7 @@ fn is_line_break_operator(op: &str) -> bool {
 ///
 /// This walks `Tj`/`TJ`/`'`/`"` operators (the old version missed `'`/`"`
 /// entirely) and turns the text-positioning operators into newlines so the
-/// result keeps some line structure — the quality scorer and the AI both
+/// result keeps some line structure , the quality scorer and the AI both
 /// depend on it. PDFs whose fonts encode text as CID glyphs with custom
 /// mappings still yield mojibake here; that is why poor-quality text falls
 /// back to vision AI in the pipeline.
@@ -629,7 +671,7 @@ fn extract_pdf_page_text(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> Res
 }
 
 // ---------------------------------------------------------------------------
-// Entry point
+
 // ---------------------------------------------------------------------------
 
 /// Auto-detect file type from the path and extract text from `bytes`.
@@ -643,6 +685,11 @@ pub fn extract_text_from_bytes(
     path: &str,
     bytes: &[u8],
 ) -> Result<(String, f64, String), String> {
+    // Verify file signature before attempting extraction , catches
+    // corrupt/misnamed files early with a clear message instead of
+    // a panic inside the extractor.
+    verify_file_signature(path, bytes)?;
+
     let ext = std::path::Path::new(path)
         .extension()
         .map(|e| e.to_string_lossy().to_lowercase())

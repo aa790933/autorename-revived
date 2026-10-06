@@ -5,6 +5,7 @@
 //! explicit and testable.
 
 use std::io;
+use std::path::PathBuf;
 
 /// Top-level application error.
 ///
@@ -51,6 +52,14 @@ pub enum AppError {
     /// An internal/unexpected error (should not normally occur).
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// A retryable transient failure (network timeout, rate limit).
+    #[error("Transient error: {0}")]
+    Transient(String),
+
+    /// File already exists at the destination.
+    #[error("Collision: {0}")]
+    Collision(String),
 }
 
 impl AppError {
@@ -77,7 +86,56 @@ impl AppError {
     pub fn to_string_lossy(&self) -> String {
         self.to_string()
     }
+
+    /// Attach context to an error, preserving the original cause.
+    pub fn with_context(self, ctx: impl AsRef<str>) -> Self {
+        let prefix = ctx.as_ref();
+        match self {
+            AppError::Io(e) => AppError::Io(io::Error::new(e.kind(), format!("{prefix}: {e}"))),
+            AppError::Network(e) => AppError::Network(format!("{prefix}: {e}")),
+            AppError::AiProvider(e) => AppError::AiProvider(format!("{prefix}: {e}")),
+            AppError::AiApi { code, message } => AppError::AiApi {
+                code,
+                message: format!("{prefix}: {message}"),
+            },
+            AppError::Config(e) => AppError::Config(format!("{prefix}: {e}")),
+            AppError::PathSafety(e) => AppError::PathSafety(format!("{prefix}: {e}")),
+            AppError::UnsupportedFileType(e) => {
+                AppError::UnsupportedFileType(format!("{prefix}: {e}"))
+            }
+            AppError::Internal(e) => AppError::Internal(format!("{prefix}: {e}")),
+            AppError::Transient(e) => AppError::Transient(format!("{prefix}: {e}")),
+            AppError::Collision(e) => AppError::Collision(format!("{prefix}: {e}")),
+            AppError::Cancelled => AppError::Cancelled,
+            AppError::Json(e) => AppError::Json(e),
+        }
+    }
+
+    /// Category label for telemetry/logging.
+    pub fn category(&self) -> &'static str {
+        match self {
+            AppError::Io(_) => "io",
+            AppError::Json(_) => "json",
+            AppError::Network(_) => "network",
+            AppError::AiProvider(_) => "ai_provider",
+            AppError::AiApi { .. } => "ai_api",
+            AppError::Config(_) => "config",
+            AppError::PathSafety(_) => "path_safety",
+            AppError::UnsupportedFileType(_) => "unsupported_file",
+            AppError::Cancelled => "cancelled",
+            AppError::Internal(_) => "internal",
+            AppError::Transient(_) => "transient",
+            AppError::Collision(_) => "collision",
+        }
+    }
 }
 
 /// Convenience alias used throughout the pipeline.
 pub type AppResult<T> = Result<T, AppError>;
+
+/// A collision record: source path and the existing destination that blocked the rename.
+#[derive(Debug, Clone)]
+pub struct CollisionInfo {
+    pub source: PathBuf,
+    pub destination: PathBuf,
+}

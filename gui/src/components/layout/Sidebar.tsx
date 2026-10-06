@@ -9,9 +9,6 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
-  Moon,
-  Sun,
-  Monitor,
   Globe,
 } from 'lucide-react';
 import { useAppStore } from '@/store';
@@ -26,15 +23,10 @@ const NAV_ITEMS = [
   { id: 'about', icon: Info, labelKey: 'navigation.about' },
 ] as const;
 
-const THEME_OPTIONS = [
-  { value: 'light', icon: Sun },
-  { value: 'dark', icon: Moon },
-  { value: 'system', icon: Monitor },
-] as const;
-
 export function Sidebar() {
   const { t } = useTranslation();
-  const { view, setView, sidebarOpen, toggleSidebar, theme, setTheme, language } = useAppStore();
+  const { view, setView, sidebarOpen, toggleSidebar, language } = useAppStore();
+  const { connectionTest } = useAppStore();
   const isRTL = getLanguageDirection(language as any) === 'rtl';
 
   return (
@@ -100,37 +92,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom section - Theme & Language */}
-      <div className="p-4 border-t border-neutral-200 dark:border-neutral-800 space-y-4">
-        {/* Theme Selector */}
-        {sidebarOpen && (
-          <div>
-            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-              {t('common.theme')}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {THEME_OPTIONS.map(({ value, icon: Icon }) => (
-                <button
-                  key={value}
-                  onClick={() => setTheme(value)}
-                  className={clsx(
-                    'flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition-all',
-                    theme === value
-                      ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 shadow-sm'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                  )}
-                  aria-pressed={theme === value}
-                  aria-label={t(`common.${value}`)}
-                >
-                  <Icon className="w-5 h-5" aria-hidden="true" />
-                  <span className="text-xs font-medium">{t(`common.${value}`)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Language Selector */}
+      {/* Bottom section - Language only (theme moved to header) */}
+      <div className="p-4 border-t border-neutral-200 dark:border-neutral-800">
         {sidebarOpen && (
           <div>
             <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
@@ -161,6 +124,14 @@ export function Sidebar() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+        {/* Connection test status */}
+        {connectionTest && (
+          <div className={`mt-3 p-2 rounded-lg text-xs ${connectionTest.success ? 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400' : 'bg-danger-100 dark:bg-danger-900/30 text-danger-700 dark:text-danger-400'}`}>
+            {connectionTest.success
+              ? `${connectionTest.provider}: ${connectionTest.latency_ms}ms`
+              : `${connectionTest.provider}: ${connectionTest.message}`}
           </div>
         )}
       </div>

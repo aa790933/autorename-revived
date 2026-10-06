@@ -169,6 +169,13 @@
       "maxEntries": "Max lots conservés",
       "maxEntriesHint": "1-100000"
     },
+    "backup": {
+      "title": "Sauvegarde de configuration",
+      "keep": "Versions de sauvegarde à conserver",
+      "keepHint": "1-100 snapshots précédents de settings.json",
+      "dir": "Répertoire de sauvegarde",
+      "dirHint": "Laisser vide pour stocker à côté de settings.json"
+    },
     "general": {
       "title": "Général",
       "debugMode": "Mode débogage",

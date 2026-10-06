@@ -8,10 +8,11 @@ import { twMerge } from 'tailwind-merge';
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'bordered' | 'elevated' | 'glass';
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  hover?: boolean;
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant = 'default', padding = 'md', children, ...props }, ref) => {
+  ({ className, variant = 'default', padding = 'md', hover = false, children, ...props }, ref) => {
     const variants = {
       default: 'bg-white dark:bg-neutral-900',
       bordered: 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800',
@@ -29,7 +30,13 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={twMerge('rounded-xl', variants[variant], paddings[padding], className)}
+        className={twMerge(
+          'rounded-xl',
+          variants[variant],
+          paddings[padding],
+          hover && 'hover:shadow-md dark:hover:shadow-neutral-900/50 transition-shadow duration-200',
+          className
+        )}
         {...props}
       >
         {children}

@@ -8,10 +8,10 @@ import { saveConfigBatch, testApiConnection, reloadConfig } from '@/services/api
 import { ProviderSelector, PROVIDERS } from './ProviderSelector';
 import { Button, Input, Textarea, Select, Toggle } from '@/components/ui';
 import { showToast } from '@/hooks/useToast';
-import type { AppConfig, AiConfig, DocumentConfig, NamingConfig, UndoConfig } from '@/types';
+import type { AppConfig, AiConfig, DocumentConfig, NamingConfig, UndoConfig, BackupConfig } from '@/types';
 
-type NestedSection = 'ai' | 'document' | 'naming' | 'undo';
-type NestedConfig = AiConfig | DocumentConfig | NamingConfig | UndoConfig;
+type NestedSection = 'ai' | 'document' | 'naming' | 'undo' | 'backup';
+type NestedConfig = AiConfig | DocumentConfig | NamingConfig | UndoConfig | BackupConfig;
 
 const PROVIDER_MODEL_KEYS: Record<string, keyof AiConfig> = {
   gemini: 'gemini_model',
@@ -195,6 +195,10 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
     checkNestedField('undo', 'log_path');
     checkNestedField('undo', 'max_entries');
 
+    // Backup fields
+    checkNestedField('backup', 'keep');
+    checkNestedField('backup', 'dir');
+
     // General fields
     checkTopLevelField('debug');
     checkTopLevelField('max_workers');
@@ -275,7 +279,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
   const providerSpecificFields = PROVIDER_FIELDS[provider] || [];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -314,7 +318,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             autoComplete="off"
           />
 
-          {/* Model */}
+          {/* Model, single field, provider-appropriate */}
           <Input
             label={t('settings.aiProvider.model')}
             value={String(localConfig.ai[modelKey] ?? '')}
@@ -323,17 +327,19 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             error={errors[`ai.${modelKey}`]}
           />
 
-          {/* Provider-specific fields */}
-          {providerSpecificFields.map((field) => (
-            <Input
-              key={field.key}
-              label={t(field.label)}
-              value={String(localConfig.ai[field.key] ?? '')}
-              onChange={(e) => handleChange('ai', field.key, e.target.value)}
-              placeholder={field.hint ? t(field.hint) : undefined}
-              error={errors[`ai.${field.key}`]}
-            />
-          ))}
+          {/* Provider-specific fields (base URLs only, no duplicate Model) */}
+          {providerSpecificFields
+            .filter(f => f.key !== 'model' && f.key !== 'gemini_model' && f.key !== 'custom_model')
+            .map((field) => (
+              <Input
+                key={field.key}
+                label={t(field.label)}
+                value={String(localConfig.ai[field.key] ?? '')}
+                onChange={(e) => handleChange('ai', field.key, e.target.value)}
+                placeholder={field.hint ? t(field.hint) : undefined}
+                error={errors[`ai.${field.key}`]}
+              />
+            ))}
 
           {/* Temperature */}
           <Input
@@ -520,6 +526,31 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             value={String(localConfig.undo.max_entries)}
             onChange={(e) => handleChangeNumber('undo', 'max_entries', parseInt(e.target.value) || 100)}
             error={errors['undo.max_entries']}
+          />
+        </div>
+      </section>
+
+      {/* Backup */}
+      <section className="space-y-4" aria-labelledby="backup-heading">
+        <h3 id="backup-heading" className="text-lg font-semibold text-gray-900 dark:text-white">
+          {t('settings.sections.backup')}
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Input
+            label={t('settings.backup.keep')}
+            type="number"
+            min={1}
+            max={100}
+            value={String(localConfig.backup?.keep ?? 3)}
+            onChange={(e) => handleChangeNumber('backup', 'keep', parseInt(e.target.value) || 3)}
+            error={errors['backup.keep']}
+          />
+          <Input
+            label={t('settings.backup.dir')}
+            value={localConfig.backup?.dir ?? ''}
+            onChange={(e) => handleChange('backup', 'dir', e.target.value)}
+            placeholder={t('settings.backup.dirHint')}
+            error={errors['backup.dir']}
           />
         </div>
       </section>

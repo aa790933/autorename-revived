@@ -39,7 +39,7 @@ export function App() {
   const { i18n } = useTranslation();
   const { setConfig, setLanguage, language, theme, setTheme } = useAppStore();
 
-  // Initialize app on mount
+
   useEffect(() => {
     let mounted = true;
 
@@ -57,7 +57,7 @@ export function App() {
           }
 
           // Initial theme sync
-          const savedTheme = localStorage.getItem('theme') || 'system' as any;
+          const savedTheme = (localStorage.getItem('theme') || 'system') as any;
           setTheme(savedTheme);
         }
 
@@ -117,6 +117,15 @@ export function App() {
       return () => mediaQuery.removeEventListener('change', listener);
     }
   }, [theme]);
+
+  // Connection test state cleanup
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      useAppStore.getState().setConnectionTest(null);
+    }, 10000);
+    return () => clearTimeout(timeout);
+  }, []);
+
   return (
     <Layout>
       <ViewContent />

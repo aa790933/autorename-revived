@@ -1,6 +1,6 @@
 /**
  * Design tokens: color, spacing, typography, motion.
- * Used by the UI layer — keep in sync with tailwind.config.js.
+ * Used by the UI layer, keep in sync with tailwind.config.js.
  */
 
 export const colors = {

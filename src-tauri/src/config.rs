@@ -85,12 +85,31 @@ impl Default for UndoConfig {
     }
 }
 
+/// Backup configuration for config file rotation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BackupConfig {
+    /// Keep N previous versions of settings.json on save.
+    pub keep: u32,
+    /// Directory for backup archives. Empty = settings directory.
+    pub dir: String,
+}
+
+impl Default for BackupConfig {
+    fn default() -> Self {
+        Self {
+            keep: 3,
+            dir: String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub ai: AiConfig,
     pub document: DocumentConfig,
     pub naming: NamingConfig,
     pub undo: UndoConfig,
+    pub backup: BackupConfig,
     pub harmonized_companies: Vec<HashMap<String, serde_json::Value>>,
     pub debug: bool,
     pub max_workers: u32,
@@ -103,6 +122,7 @@ impl Default for AppConfig {
             document: DocumentConfig::default(),
             naming: NamingConfig::default(),
             undo: UndoConfig::default(),
+            backup: BackupConfig::default(),
             harmonized_companies: Vec::new(),
             debug: false,
             max_workers: 4,
@@ -237,6 +257,7 @@ pub async fn load_config(app: tauri::AppHandle) -> Result<AppConfig, String> {
 
 pub async fn save_config(app: tauri::AppHandle, config: &AppConfig) -> Result<(), String> {
     let store_path = get_store_path(&app)?;
+    rotate_backup(&store_path, &config.backup)?;
     let store = StoreBuilder::new(&app, store_path)
         .build()
         .map_err(|e| e.to_string())?;
@@ -245,6 +266,42 @@ pub async fn save_config(app: tauri::AppHandle, config: &AppConfig) -> Result<()
         serde_json::to_value(config).map_err(|e| e.to_string())?,
     );
     store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Rotate backup copies of the settings file before each save.
+///
+/// Keeps `backup.keep` numbered snapshots (settings.json.1, .2, …)
+/// in the backup directory (or the settings directory when empty).
+fn rotate_backup(settings_path: &PathBuf, backup: &BackupConfig) -> Result<(), String> {
+    if backup.keep == 0 || !settings_path.exists() {
+        return Ok(());
+    }
+    let backup_dir = if backup.dir.trim().is_empty() {
+        settings_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."))
+    } else {
+        let p = expand_tilde(&backup.dir);
+        if !p.exists() {
+            std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+        }
+        p
+    };
+    let base = settings_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "settings.json".to_string());
+    // Shift existing backups down (3 → 4, 2 → 3, …) then copy current → .1
+    for i in (1..backup.keep).rev() {
+        let src = backup_dir.join(format!("{base}.{i}"));
+        let dst = backup_dir.join(format!("{base}.{}", i + 1));
+        if src.exists() {
+            let _ = std::fs::rename(src, dst);
+        }
+    }
+    let _ = std::fs::copy(settings_path, backup_dir.join(format!("{base}.1")));
     Ok(())
 }
 
@@ -343,6 +400,7 @@ pub fn config_key_is_known(key: &str) -> bool {
                 | "suggestion_languages"
         ),
         "undo" => matches!(field, "enabled" | "log_path" | "max_entries"),
+        "backup" => matches!(field, "keep" | "dir"),
         "_general" => matches!(field, "debug" | "max_workers"),
         _ => false,
     }
@@ -538,6 +596,22 @@ pub fn apply_config_update(
                 }
             }
         }
+        "backup" => {
+            let backup = &mut config.backup;
+            match field {
+                "keep" => {
+                    let v: u32 = parse_num(value, "backup.keep")?;
+                    if v == 0 || v > 100 {
+                        return Err("backup.keep must be between 1 and 100".into());
+                    }
+                    backup.keep = v;
+                }
+                "dir" => backup.dir = value.to_string(),
+                _ => {
+                    return Err(format!("Unknown backup config field: {}", field));
+                }
+            }
+        }
         "_general" => match field {
             "debug" => {
                 config.debug = parse_bool(value).ok_or_else(|| {
@@ -601,7 +675,7 @@ fn extract_placeholders(template: &str) -> Vec<String> {
 
 /// Reject separators that would produce illegal file names.
 ///
-/// An empty value is allowed and means "use the default `_`" — the UI field
+/// An empty value is allowed and means "use the default `_`" , the UI field
 /// can therefore be cleared to reset it, which `document::effective_separator`
 /// already handles.
 fn is_invalid_separator(value: &str) -> bool {

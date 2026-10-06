@@ -9,6 +9,7 @@ import type {
   BatchResult,
   AppConfig,
   FileResult,
+  TestConnectionResult,
 } from '@/types';
 import { generateId } from '@/utils/helpers';
 
@@ -36,9 +37,13 @@ interface AppState {
   lastBatchId: string | null;
   setResults: (result: BatchResult, isDryRun: boolean) => void;
 
-  // Error state
+
   statusError: string;
   setStatusError: (error: string) => void;
+
+  // Connection test state
+  connectionTest: TestConnectionResult | null;
+  setConnectionTest: (result: TestConnectionResult | null) => void;
 
   // Config
   config: AppConfig | null;
@@ -71,6 +76,7 @@ const initialState = {
   dryRunResult: null,
   lastBatchId: null,
   statusError: '',
+  connectionTest: null,
   config: null,
   sidebarOpen: true,
   theme: 'system' as const,
@@ -143,8 +149,11 @@ export const useAppStore = create<AppState>()(
       };
     }),
 
-    // Error actions
+  
     setStatusError: (error) => set({ statusError: error }),
+
+    // Connection test actions
+    setConnectionTest: (result) => set({ connectionTest: result }),
 
     // Config actions
     setConfig: (config) => set({ config }),

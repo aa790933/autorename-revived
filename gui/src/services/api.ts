@@ -91,14 +91,25 @@ export async function validateConfig(): Promise<ConfigValidation> {
 }
 
 /**
- * Test API connection to a provider
+ * Test API connection to a provider (with latency reporting)
  */
 export async function testApiConnection(
   provider: string,
   api_key: string,
   model: string
 ): Promise<TestConnectionResult> {
-  return invoke<TestConnectionResult>('test_connection', { provider, api_key, model });
+  return invoke<TestConnectionResult>('test_connection', {
+    provider: provider || null,
+    api_key: api_key || null,
+    model: model || null,
+  });
+}
+
+/**
+ * Save config with backup rotation (keeps N prior versions).
+ */
+export async function saveConfigWithBackup(config: AppConfig): Promise<void> {
+  return invoke<void>('save_app_config', { config });
 }
 
 /**
