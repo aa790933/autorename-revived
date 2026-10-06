@@ -70,7 +70,7 @@ export function HistoryView() {
           {t('history.noHistory')}
         </h3>
         <p className="text-gray-500 dark:text-gray-400 mb-6">
-          {t('history.noHistoryDesc') || 'No rename operations have been performed yet.'}
+          {t('history.noHistoryDesc', 'No rename operations have been performed yet.')}
         </p>
         <Button variant="primary" onClick={() => useAppStore.getState().setView('files')}>
           {t('navigation.files')}
@@ -131,7 +131,7 @@ export function HistoryView() {
         </h3>
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {batch.files.map((file, index) => (
-            <FileHistoryRow key={file.file} file={file} index={index} />
+            <FileHistoryRow key={index} file={file} index={index} />
           ))}
         </div>
       </Card>

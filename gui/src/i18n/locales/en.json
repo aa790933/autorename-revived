@@ -179,6 +179,7 @@
   "history": {
     "title": "Rename History",
     "noHistory": "No rename history yet",
+    "noHistoryDesc": "No rename operations have been performed yet.",
     "batch": "Batch",
     "timestamp": "Timestamp",
     "filesProcessed": "Files Processed",

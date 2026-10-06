@@ -179,6 +179,7 @@
   "history": {
     "title": "Historique des renommages",
     "noHistory": "Aucun historique de renommage",
+    "noHistoryDesc": "Aucune opération de renommage n'a été effectuée pour le moment.",
     "batch": "Lot",
     "timestamp": "Horodatage",
     "filesProcessed": "Fichiers traités",

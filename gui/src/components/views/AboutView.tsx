@@ -6,15 +6,15 @@ import { Github, AlertCircle, FileText, CheckCircle, Heart } from 'lucide-react'
 import { Card, Badge } from '@/components/ui';
 import { __APP_VERSION__ } from '@/utils/helpers';
 
-const FEATURES = [
-  { icon: CheckCircle, label: 'about.features.nativeBackend' },
-  { icon: CheckCircle, label: 'about.features.multiProvider' },
-  { icon: CheckCircle, label: 'about.features.localExtraction' },
-  { icon: CheckCircle, label: 'about.features.visionMode' },
-  { icon: CheckCircle, label: 'about.features.multiLanguage' },
-  { icon: CheckCircle, label: 'about.features.customTemplates' },
-  { icon: CheckCircle, label: 'about.features.undoHistory' },
-  { icon: CheckCircle, label: 'about.features.portableMode' },
+export const FEATURES = [
+  { icon: CheckCircle, labelKey: 'about.features.nativeBackend' },
+  { icon: CheckCircle, labelKey: 'about.features.multiProvider' },
+  { icon: CheckCircle, labelKey: 'about.features.localExtraction' },
+  { icon: CheckCircle, labelKey: 'about.features.visionMode' },
+  { icon: CheckCircle, labelKey: 'about.features.multiLanguage' },
+  { icon: CheckCircle, labelKey: 'about.features.customTemplates' },
+  { icon: CheckCircle, labelKey: 'about.features.undoHistory' },
+  { icon: CheckCircle, labelKey: 'about.features.portableMode' },
 ];
 
 const LINKS = [
@@ -57,10 +57,10 @@ export function AboutView() {
           {t('about.features')}
         </h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          {FEATURES.map(({ icon: Icon, label }, index) => (
+          {FEATURES.map(({ icon: Icon, labelKey }, index) => (
             <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
               <Icon className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" aria-hidden="true" />
-              <span className="text-gray-700 dark:text-gray-300">{t(label)}</span>
+              <span className="text-gray-700 dark:text-gray-300">{t(labelKey)}</span>
             </div>
           ))}
         </div>
