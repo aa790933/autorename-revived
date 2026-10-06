@@ -139,6 +139,25 @@ export function FileList() {
                 </Button>
               )}
               <Button
+                variant="primary"
+                size="sm"
+                onClick={() => runRename(false)}
+                disabled={!canRun || processing}
+                aria-label={t('files.actions.rename', { count: pendingCount })}
+              >
+                {t('files.actions.rename', { count: pendingCount })}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => runRename(true)}
+                disabled={!canRun || processing}
+                aria-label={t('files.actions.dryRun')}
+              >
+                <RotateCcw className="w-4 h-4 mr-1.5" aria-hidden="true" />
+                {t('files.actions.dryRun')}
+              </Button>
+              <Button
                 variant="secondary"
                 size="sm"
                 onClick={handleBrowseFiles}
@@ -152,14 +171,13 @@ export function FileList() {
           ) : (
             <>
               <Button
-                variant="danger"
+                variant="primary"
                 size="sm"
-                onClick={handleCancel}
-                disabled={!canCancel}
-                aria-label={t('files.actions.cancel')}
+                onClick={() => runRename(false)}
+                disabled={!canRun || processing}
+                aria-label={t('files.actions.rename', { count: pendingCount })}
               >
-                <X className="w-4 h-4 mr-1.5" aria-hidden="true" />
-                {t('files.actions.cancel')}
+                {t('files.actions.rename', { count: pendingCount })}
               </Button>
               <Button
                 variant="secondary"
@@ -172,13 +190,14 @@ export function FileList() {
                 {t('files.actions.dryRun')}
               </Button>
               <Button
-                variant="primary"
+                variant="danger"
                 size="sm"
-                onClick={() => runRename(false)}
-                disabled={!canRun || processing}
-                aria-label={t('files.actions.rename', { count: pendingCount })}
+                onClick={handleCancel}
+                disabled={!canCancel}
+                aria-label={t('files.actions.cancel')}
               >
-                {t('files.actions.rename', { count: pendingCount })}
+                <X className="w-4 h-4 mr-1.5" aria-hidden="true" />
+                {t('files.actions.cancel')}
               </Button>
             </>
           )}

@@ -95,10 +95,10 @@ export async function validateConfig(): Promise<ConfigValidation> {
  */
 export async function testApiConnection(
   provider: string,
-  apiKey: string,
+  api_key: string,
   model: string
 ): Promise<TestConnectionResult> {
-  return invoke<TestConnectionResult>('test_connection', { provider, apiKey, model });
+  return invoke<TestConnectionResult>('test_connection', { provider, api_key, model });
 }
 
 /**

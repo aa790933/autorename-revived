@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRight, CheckCircle, AlertCircle, Clock, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Button, Badge } from '@/components/ui';
 import { clsx } from 'clsx';
-import { escapeHtml } from '@/utils/helpers';
+import { escapeHtml, truncate } from '@/utils/helpers';
 import type { FileEntry } from '@/types';
 
 interface FileRowProps {
@@ -128,9 +128,4 @@ export function FileRow({ file, onSelectSuggestion }: FileRowProps) {
       </div>
     </div>
   );
-}
-
-function truncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength - 3) + '...';
 }
