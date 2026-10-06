@@ -37,7 +37,7 @@ function ViewContent() {
 
 export function App() {
   const { i18n } = useTranslation();
-  const { setConfig, setLanguage } = useAppStore();
+  const { setConfig, setLanguage, language, theme, setTheme } = useAppStore();
 
   // Initialize app on mount
   useEffect(() => {
@@ -49,29 +49,16 @@ export function App() {
         const loadedConfig = await loadAppConfig();
         if (mounted) {
           setConfig(loadedConfig);
-        }
+          
+          // Initial language sync
+          const savedLang = localStorage.getItem('language') || loadedConfig?.naming?.primary_language?.toLowerCase() || 'en';
+          if (savedLang && i18n.languages.includes(savedLang)) {
+            setLanguage(savedLang);
+          }
 
-        // Set language from config or localStorage
-        const savedLang = localStorage.getItem('language') || loadedConfig?.naming?.primary_language?.toLowerCase() || 'en';
-        if (savedLang && i18n.languages.includes(savedLang)) {
-          await i18n.changeLanguage(savedLang);
-          if (mounted) setLanguage(savedLang);
-        }
-
-        // Apply theme
-        const savedTheme = localStorage.getItem('theme') || 'system';
-        if (savedTheme === 'dark' || (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-
-        // Set RTL direction for Arabic
-        const currentLang = i18n.language;
-        if (getLanguageDirection(currentLang as any) === 'rtl') {
-          document.documentElement.dir = 'rtl';
-        } else {
-          document.documentElement.dir = 'ltr';
+          // Initial theme sync
+          const savedTheme = localStorage.getItem('theme') || 'system' as any;
+          setTheme(savedTheme);
         }
 
         // Validate config after a short delay
@@ -99,23 +86,37 @@ export function App() {
     return () => {
       mounted = false;
     };
-  }, [i18n, setConfig, setLanguage]);
+  }, [setConfig, setLanguage, setTheme, t]);
 
-  // Listen for language changes
+  // Reactive Language Effect
   useEffect(() => {
-    const handleLanguageChange = (lng: string) => {
-      if (getLanguageDirection(lng as any) === 'rtl') {
-        document.documentElement.dir = 'rtl';
+    if (language) {
+      i18n.changeLanguage(language);
+      document.documentElement.dir = getLanguageDirection(language as any);
+      localStorage.setItem('language', language);
+    }
+  }, [language, i18n]);
+
+  // Reactive Theme Effect
+  useEffect(() => {
+    const applyTheme = (t: string) => {
+      if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
       } else {
-        document.documentElement.dir = 'ltr';
+        document.documentElement.classList.remove('dark');
       }
-      localStorage.setItem('language', lng);
     };
 
-    i18n.on('languageChanged', handleLanguageChange);
-    return () => i18n.off('languageChanged', handleLanguageChange);
-  }, [i18n]);
+    applyTheme(theme);
+    localStorage.setItem('theme', theme);
 
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light');
+      mediaQuery.addEventListener('change', listener);
+      return () => mediaQuery.removeEventListener('change', listener);
+    }
+  }, [theme]);
   return (
     <Layout>
       <ViewContent />

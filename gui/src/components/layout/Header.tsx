@@ -2,14 +2,15 @@
  * Header / title bar
  */
 import { useTranslation } from 'react-i18next';
-import { Minimize, Maximize, X, Menu, Sun, Moon, Monitor } from 'lucide-react';
+import { Minimize, Maximize, X, Menu, Sun, Moon, Monitor, ScanEye } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { Button } from '@/components/ui';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { saveConfigBatch } from '@/services/api';
 
 export function Header() {
   const { t } = useTranslation();
-  const { sidebarOpen, toggleSidebar, theme, setTheme, view } = useAppStore();
+  const { sidebarOpen, toggleSidebar, theme, setTheme, view, config, setConfig } = useAppStore();
 
   const handleMinimize = async () => {
     const window = getCurrentWindow();
@@ -26,15 +27,15 @@ export function Header() {
     await window.close();
   };
 
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme);
-    if (newTheme === 'system') {
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.classList.toggle('dark', systemDark);
-    } else {
-      document.documentElement.classList.toggle('dark', newTheme === 'dark');
-    }
-    localStorage.setItem('theme', newTheme);
+  const toggleVision = async () => {
+    if (!config) return;
+    const nextVision = config.document.vision === 'true' ? 'false' : 'true';
+    const nextConfig = {
+      ...config,
+      document: { ...config.document, vision: nextVision }
+    };
+    setConfig(nextConfig);
+    await saveConfigBatch([{ key: 'document.vision', value: nextVision }]);
   };
 
   return (
@@ -72,6 +73,27 @@ export function Header() {
 
         {/* Right side - Theme toggle and window controls */}
         <div className="flex items-center gap-2">
+          {/* Vision Mode Toggle */}
+          {config && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleVision}
+              aria-label={t('settings.documentProcessing.vision')}
+              title={t('settings.documentProcessing.vision')}
+              className={`p-1.5 h-auto rounded-lg transition-colors ${
+                config.document.vision === 'true'
+                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
+                  : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+              }`}
+            >
+              <ScanEye className="w-4 h-4" aria-hidden="true" />
+              {config.document.vision === 'true' && (
+                <span className="ml-1.5 text-xs font-medium hidden md:block">Vision</span>
+              )}
+            </Button>
+          )}
+
           {/* Theme Toggle */}
           <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg p-1">
             {[
@@ -81,7 +103,7 @@ export function Header() {
             ].map(({ value, icon: Icon }) => (
               <button
                 key={value}
-                onClick={() => handleThemeChange(value as any)}
+                onClick={() => setTheme(value as any)}
                 className={`
                   p-1.5 rounded transition-colors
                   ${theme === value
