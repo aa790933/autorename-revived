@@ -657,10 +657,11 @@ fn render_template(template: &str, fields: &HashMap<String, String>, separator: 
 /// Produce a file name that does not collide with anything in `directory`.
 ///
 /// If `filename` contains the `{sequence}` token, the token is replaced by the
-/// first free zero-padded counter (`_01`, `_02`, …). Without the token, a
-/// counter is appended to the stem.
+/// first free zero-padded counter (`_01`, `_02`, …). Without the token, slot 1
+/// is the name as rendered and slot 2+ inserts a counter between the stem and
+/// the extension (`Report.pdf` -> `Report_02.pdf`, not `Report.pdf_02`).
 ///
-/// Returns an error when every candidate up to [`MAX_SEQUENCE`] is taken , the
+/// Returns an error when every candidate up to [`MAX_SEQUENCE`] is taken, the
 /// alternative would be handing back a name that already exists on disk.
 pub fn ensure_unique_filename(
     directory: &str,
@@ -671,8 +672,21 @@ pub fn ensure_unique_filename(
     let candidate = |counter: u32| -> String {
         if has_token {
             filename.replace(SEQUENCE_TOKEN, &sequence_suffix(counter, zerofill))
+        } else if counter == 1 {
+            filename.to_string()
         } else {
-            format!("{}{}", filename, sequence_suffix(counter, zerofill))
+            // Insert the counter between stem and extension so the result
+            // keeps a valid extension (`Report_02.pdf`, not `Report.pdf_02`).
+            let path = Path::new(filename);
+            let stem = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| filename.to_string());
+            let ext = path
+                .extension()
+                .map(|e| format!(".{}", e.to_string_lossy()))
+                .unwrap_or_default();
+            format!("{}{}{}", stem, sequence_suffix(counter, zerofill), ext)
         }
     };
 
@@ -925,9 +939,7 @@ mod tests {
         assert!(!name.contains("20241340"), "invalid date leaked: {}", name);
     }
 
-    // -----------------------------------------------------------------------
     // Unique naming
-    // -----------------------------------------------------------------------
 
     #[test]
     fn ensure_unique_filename_resolves_the_sequence_token() {
@@ -971,9 +983,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    // -----------------------------------------------------------------------
     // Path safety
-    // -----------------------------------------------------------------------
 
     #[test]
     fn resolve_safe_path_blocks_traversal_and_separators() {
@@ -1001,9 +1011,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
-    // -----------------------------------------------------------------------
     // Dates
-    // -----------------------------------------------------------------------
 
     #[test]
     fn parse_document_date_accepts_known_shapes_and_validates_them() {

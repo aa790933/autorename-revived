@@ -1,6 +1,4 @@
-/**
- * Sidebar navigation with language/theme controls
- */
+// Sidebar navigation with language/theme controls
 import { useTranslation } from 'react-i18next';
 import {
   FileText,
@@ -13,7 +11,9 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { Button } from '@/components/ui';
-import { SUPPORTED_LANGUAGES, getLanguageDirection } from '@/i18n';
+import { getLanguageDirection, type SupportedLanguage } from '@/i18n';
+import { SUPPORTED_LANGUAGES } from '@/i18n';
+import { AppView } from '@/types';
 import clsx from 'clsx';
 
 const NAV_ITEMS = [
@@ -27,7 +27,7 @@ export function Sidebar() {
   const { t } = useTranslation();
   const { view, setView, sidebarOpen, toggleSidebar, language } = useAppStore();
   const { connectionTest } = useAppStore();
-  const isRTL = getLanguageDirection(language as any) === 'rtl';
+  const isRTL = getLanguageDirection(language as SupportedLanguage) === 'rtl';
 
   return (
     <aside
@@ -75,7 +75,7 @@ export function Sidebar() {
         {NAV_ITEMS.map(({ id, icon: Icon, labelKey }) => (
           <button
             key={id}
-            onClick={() => setView(id as any)}
+            onClick={() => setView(id as AppView)}
             className={clsx(
               'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
               view === id

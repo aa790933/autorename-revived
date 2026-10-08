@@ -1,6 +1,4 @@
-/**
- * File list container
- */
+// File list container
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store';
 import { useRename } from '@/hooks/useRename';

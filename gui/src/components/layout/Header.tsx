@@ -1,6 +1,4 @@
-/**
- * Header / title bar
- */
+// Header / title bar
 import { useTranslation } from 'react-i18next';
 import { Minimize, Maximize, X, Menu, Sun, Moon, Monitor } from 'lucide-react';
 import { useAppStore } from '@/store';
@@ -71,7 +69,7 @@ export function Header() {
             ].map(({ value, icon: Icon }) => (
               <button
                 key={value}
-                onClick={() => setTheme(value as any)}
+                onClick={() => setTheme(value as 'light' | 'dark' | 'system')}
                 className={`p-1.5 rounded transition-colors
                   ${theme === value
                     ? 'bg-white dark:bg-neutral-700 text-primary-600 dark:text-primary-400 shadow-sm'

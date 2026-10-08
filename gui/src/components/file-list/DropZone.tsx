@@ -1,6 +1,4 @@
-/**
- * Drag-and-drop file zone
- */
+// Drag-and-drop file zone
 import { useTranslation } from 'react-i18next';
 import { FileText, Upload, FolderOpen } from 'lucide-react';
 import { clsx } from 'clsx';

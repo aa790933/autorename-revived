@@ -1,6 +1,4 @@
-/**
- * Main App Component
- */
+// Main App Component
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Layout } from '@/components/layout';
@@ -12,7 +10,7 @@ import { useAppStore } from '@/store';
 import { loadAppConfig, validateConfig } from '@/services/api';
 import { showToast } from '@/hooks/useToast';
 import { t } from '@/hooks/useTranslation';
-import { getLanguageDirection } from '@/i18n';
+import { getLanguageDirection, type SupportedLanguage } from '@/i18n';
 
 function ViewContent() {
   const { view } = useAppStore();
@@ -57,7 +55,7 @@ export function App() {
           }
 
           // Initial theme sync
-          const savedTheme = (localStorage.getItem('theme') || 'system') as any;
+          const savedTheme = (localStorage.getItem('theme') || 'system') as 'light' | 'dark' | 'system';
           setTheme(savedTheme);
         }
 
@@ -92,7 +90,7 @@ export function App() {
   useEffect(() => {
     if (language) {
       i18n.changeLanguage(language);
-      document.documentElement.dir = getLanguageDirection(language as any);
+      document.documentElement.dir = getLanguageDirection(language as SupportedLanguage);
       localStorage.setItem('language', language);
     }
   }, [language, i18n]);

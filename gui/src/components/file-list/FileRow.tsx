@@ -1,6 +1,4 @@
-/**
- * Individual file row
- */
+// Individual file row
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, CheckCircle, AlertCircle, Clock, XCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { Button, Badge } from '@/components/ui';

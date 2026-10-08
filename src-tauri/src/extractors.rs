@@ -135,9 +135,7 @@ pub fn assess_text_quality(text: &str) -> f64 {
     (alpha_ratio * 0.7 + word_bonus + newline_bonus).min(1.0)
 }
 
-// ---------------------------------------------------------------------------
 // XML plumbing shared by the Office extractors
-// ---------------------------------------------------------------------------
 
 /// `(name, is_closing)` for an XML tag body such as `w:t xml:space="preserve"`
 /// or `/w:p`. Also treats processing instructions and comments as unnamed.
@@ -310,9 +308,7 @@ fn extract_tag_runs(xml: &str, text_tag: &str, para_tag: &str) -> String {
     tidy_blank_lines(&out)
 }
 
-// ---------------------------------------------------------------------------
 // DOCX / PPTX
-// ---------------------------------------------------------------------------
 
 /// Extract text from a DOCX file (ZIP containing word/document.xml).
 pub fn extract_text_from_docx(bytes: &[u8]) -> Result<String, String> {
@@ -362,9 +358,7 @@ pub fn extract_text_from_pptx(bytes: &[u8]) -> Result<String, String> {
     Ok(all_text.join("\n"))
 }
 
-// ---------------------------------------------------------------------------
 // XLSX
-// ---------------------------------------------------------------------------
 
 /// Parse `<si>` blocks from sharedStrings.xml into indexed strings.
 ///
@@ -572,9 +566,7 @@ pub fn extract_text_from_xlsx(bytes: &[u8]) -> Result<String, String> {
     Ok(all_text.join("\n"))
 }
 
-// ---------------------------------------------------------------------------
 // PDF
-// ---------------------------------------------------------------------------
 
 /// Pages parsed before giving up. Long enough for any real letter/invoice
 /// batch, short enough to keep a 500-page dump from stalling a low-end PC.
@@ -670,10 +662,6 @@ fn extract_pdf_page_text(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> Res
     Ok(tidy_blank_lines(&text))
 }
 
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-
 /// Auto-detect file type from the path and extract text from `bytes`.
 ///
 /// Takes the already-read buffer rather than a path: the pipeline reads each
@@ -723,11 +711,9 @@ pub fn extract_text_from_bytes(
 }
 
 /// Decode bytes to string using BOM detection and encoding sniffing.
-///
-/// BOM checks run *before* the UTF-8 validation: `from_utf8` happily accepts
-/// a leading UTF-8 BOM (leaking U+FEFF into the text) and UTF-16 files pass
-/// it as garbage, which previously fell through to the Latin-1 decoder and
-/// produced mojibake for every UTF-16 `.txt`/`.csv` on Windows.
+/// BOM checks run *before* UTF-8 validation: `from_utf8` accepts a
+/// leading BOM (leaking U+FEFF) and UTF-16 files pass as garbage,
+/// which the Latin-1 decoder turns into mojibake.
 pub fn decode_bytes_to_string(bytes: &[u8]) -> String {
     if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         return String::from_utf8_lossy(&bytes[3..]).into_owned();
@@ -829,9 +815,7 @@ mod tests {
         assert_eq!(decode_bytes_to_string(b"plain"), "plain");
     }
 
-    // -----------------------------------------------------------------------
     // Extension classification (kept in sync with the frontend list)
-    // -----------------------------------------------------------------------
 
     #[test]
     fn extension_classification_is_case_insensitive() {
@@ -875,9 +859,7 @@ mod tests {
         assert!(!is_supported_extension("noextension"));
     }
 
-    // -----------------------------------------------------------------------
     // Local extraction entry point
-    // -----------------------------------------------------------------------
 
     #[test]
     fn extract_text_from_bytes_handles_plain_text_and_reports_quality() {
