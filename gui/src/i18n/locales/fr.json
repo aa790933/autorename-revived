@@ -220,6 +220,7 @@
     "configSaved": "{{count}} paramètres enregistrés",
     "configSavePartial": "{{saved}} enregistrés, {{failed}} échoués",
     "configSaveFailed": "Échec de l'enregistrement : {{error}}",
+    "configErrors": "Problèmes de configuration : {{errors}}",
     "connectionTestSuccess": "{{provider}} : Connecté avec succès ({{latency}}ms)",
     "connectionTestFailed": "{{provider}} : {{error}}",
     "renamePreview": "Aperçu : {{completed}} à traiter, {{skipped}} à ignorer",

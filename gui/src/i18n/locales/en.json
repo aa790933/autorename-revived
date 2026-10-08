@@ -221,6 +221,7 @@
     "configSaved": "{{count}} settings saved",
     "configSavePartial": "{{saved}} saved, {{failed}} failed",
     "configSaveFailed": "Save failed: {{error}}",
+    "configErrors": "Configuration issues: {{errors}}",
     "connectionTestSuccess": "{{provider}}: Connected successfully ({{latency}}ms)",
     "connectionTestFailed": "{{provider}}: {{error}}",
     "renamePreview": "Preview: {{completed}} to process, {{skipped}} to skip",

@@ -129,7 +129,9 @@ struct TestConnectionRequest {
 #[tauri::command]
 async fn test_connection(
     app: tauri::AppHandle,
-    request: TestConnectionRequest,
+    provider: Option<String>,
+    api_key: Option<String>,
+    model: Option<String>,
 ) -> TestConnectionResult {
     // Start from the saved configuration so the probe exercises the real
     // base URLs / model wiring, then apply the live UI overrides.
@@ -137,13 +139,13 @@ async fn test_connection(
         Ok(cfg) => cfg.ai,
         Err(_) => AiConfig::default(),
     };
-    if let Some(p) = request.provider.filter(|p| !p.trim().is_empty()) {
+    if let Some(p) = provider.filter(|p| !p.trim().is_empty()) {
         config.provider = p;
     }
-    if let Some(k) = request.api_key.filter(|k| !k.trim().is_empty()) {
+    if let Some(k) = api_key.filter(|k| !k.trim().is_empty()) {
         config.api_key = k;
     }
-    if let Some(m) = request.model.filter(|m| !m.trim().is_empty()) {
+    if let Some(m) = model.filter(|m| !m.trim().is_empty()) {
         match config.provider.as_str() {
             "gemini" => config.gemini_model = m,
             "openai" | "anthropic" => config.model = m,

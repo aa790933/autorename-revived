@@ -220,6 +220,7 @@
     "configSaved": "تم حفظ {{count}} إعداد",
     "configSavePartial": "تم حفظ {{saved}}، فشل {{failed}}",
     "configSaveFailed": "فشل الحفظ: {{error}}",
+    "configErrors": "مشكلات الإعداد: {{errors}}",
     "connectionTestSuccess": "{{provider}}: تم الاتصال بنجاح ({{latency}}ms)",
     "connectionTestFailed": "{{provider}}: {{error}}",
     "renamePreview": "معاينة: {{completed}} للمعالجة، {{skipped}} للتخطي",
