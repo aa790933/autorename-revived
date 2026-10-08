@@ -78,7 +78,7 @@ function updateNestedSection(
 
 export function SettingsForm({ onBack }: SettingsFormProps) {
   const { t } = useTranslation();
-  const { config, setConfig } = useAppStore();
+  const { config, setConfig, language, setLanguage } = useAppStore();
   const [localConfig, setLocalConfig] = useState<typeof config>(config);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -324,7 +324,7 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             label={t('settings.aiProvider.model')}
             value={String(localConfig.ai[modelKey] ?? '')}
             onChange={(e) => handleChange('ai', modelKey, e.target.value)}
-            placeholder={provider === 'gemini' ? 'gemini-2.0-flash' : provider === 'openai' ? 'gpt-4o-mini' : 'llama3.2'}
+            placeholder={provider === 'gemini' ? 'gemini-3.7-flash' : provider === 'openai' ? 'gpt-4o-mini' : 'llama3.2'}
             error={errors[`ai.${modelKey}`]}
           />
 

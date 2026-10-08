@@ -24,7 +24,6 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const { t } = useTranslation();
   const { view, setView, sidebarOpen, toggleSidebar, language } = useAppStore();
-  const { connectionTest } = useAppStore();
   const isRTL = getLanguageDirection(language as SupportedLanguage) === 'rtl';
 
   return (

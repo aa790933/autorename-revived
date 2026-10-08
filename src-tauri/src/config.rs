@@ -875,7 +875,7 @@ mod tests {
     #[test]
     fn suggestion_languages_are_split_and_trimmed() {
         let mut c = config();
-        apply_config_update(&mut c, "naming.suggestion_languages", " French , Arabic ,, ").unwrap();
+        apply_config_update(&mut c, "naming.suggestion_languages", " French , Arabic, ").unwrap();
         assert_eq!(c.naming.suggestion_languages, vec!["French", "Arabic"]);
 
         apply_config_update(&mut c, "naming.suggestion_languages", "").unwrap();

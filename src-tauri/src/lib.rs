@@ -210,7 +210,7 @@ fn with_extension(mut name: String, ext: &str) -> String {
     name
 }
 
-/// Refuse to read files that would exhaust memory (or hang extraction) ,
+/// Refuse to read files that would exhaust memory (or hang extraction)
 /// documents that big are not the target of this tool anyway.
 const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024;
 

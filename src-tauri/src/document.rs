@@ -542,7 +542,7 @@ pub fn generate_filename(
 
     // Reserve room for the extension. If the rendered name is too long, the
     // stem must be truncated down to `max_length - suffix` so the *final*
-    // file name (stem + extension) fits the limit and keeps its extension ,
+    // file name (stem + extension) fits the limit and keeps its extension
     // Windows routing/formatting depends on the extension being present.
     let avail = config.max_length as usize;
     if suffix.is_empty() {
