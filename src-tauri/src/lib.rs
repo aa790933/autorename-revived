@@ -6,7 +6,7 @@ mod portable;
 
 use ai::{AiConfig, DocumentMetadata, TestConnectionResult};
 use config::{
-    AppConfig, BackupConfig, ConfigBatchResult, NamingConfig, load_config, save_config, save_config_batch,
+    AppConfig, ConfigBatchResult, NamingConfig, load_config, save_config, save_config_batch,
 };
 use document::{BatchResult, FileResult, UndoHistory, UndoResult, resolve_safe_path};
 use serde::{Deserialize, Serialize};

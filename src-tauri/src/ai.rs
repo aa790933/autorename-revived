@@ -6,6 +6,10 @@ use std::time::Instant;
 use tracing::info;
 
 const GEMINI_DEFAULT_MODEL: &str = "gemini-3.7-flash";
+
+fn default_gemini_model() -> String {
+    GEMINI_DEFAULT_MODEL.to_string()
+}
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com";
 const OPENAI_API_BASE: &str = "https://api.openai.com";
 const ANTHROPIC_API_BASE: &str = "https://api.anthropic.com";
