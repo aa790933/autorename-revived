@@ -54,6 +54,22 @@ export function useRename() {
 
       setResults(result, dryRun);
 
+      // Apply per-file results so rows flip out of 'processing'
+      // (the store has replaceFileResult/updateFileStatus for this;
+      // they were defined but never wired up, so every file stayed
+      // 'processing' until the whole list was cleared).
+      useAppStore.setState(state => ({
+        files: state.files.map(f => {
+          const match = result.files.find(r => r.file === f.path);
+          if (!match) return f;
+          const status: FileEntry['status'] =
+            match.status === 'completed' ? 'completed'
+            : match.status === 'skipped' ? 'skipped'
+            : 'failed';
+          return { ...f, status, result: match };
+        }),
+      }));
+
       if (dryRun) {
         if (result.completed === 0 && result.skipped > 0) {
           showToast(t('toasts.renamePreviewAllSkipped'), 'info');
