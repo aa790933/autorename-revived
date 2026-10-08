@@ -426,12 +426,9 @@ fn request_timeout(config: &AiConfig) -> u64 {
     config.timeout.max(60)
 }
 
-// ---------------------------------------------------------------------------
-// Provider base URL resolution (config override, else provider default)
-//
+// Provider base URL resolution (config override, else provider default).
 // Each provider has a dedicated override field; `base_url` is the generic
 // OpenAI-compatible override. The dedicated field always wins.
-// ---------------------------------------------------------------------------
 
 fn first_non_empty<'a>(candidates: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
     candidates
@@ -530,9 +527,7 @@ fn default_model_for(provider: &str) -> &'static str {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Multi-language extraction (aligned results)
-// ---------------------------------------------------------------------------
 
 /// Extracts metadata via text for each requested language.
 ///
@@ -634,9 +629,7 @@ pub async fn extract_metadata_vision_multi(
     results
 }
 
-// ---------------------------------------------------------------------------
 // Public single-file entry points
-// ---------------------------------------------------------------------------
 
 pub async fn extract_metadata_text(
     text: &str,
@@ -753,9 +746,7 @@ pub fn get_model_name(config: &AiConfig) -> String {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Gemini
-// ---------------------------------------------------------------------------
 
 async fn gemini_text_extract(
     text: &str,
@@ -905,9 +896,7 @@ async fn gemini_vision_extract(
     Ok(data_to_metadata(&parsed))
 }
 
-// ---------------------------------------------------------------------------
 // OpenAI
-// ---------------------------------------------------------------------------
 
 /// Extracts the error message from an OpenAI-style error body, if present.
 fn openai_error_message(json: &serde_json::Value) -> Option<String> {
@@ -1078,9 +1067,7 @@ fn openai_compat_message_text(json: &serde_json::Value) -> Result<&str, String> 
     Err("No content in response".to_string())
 }
 
-// ---------------------------------------------------------------------------
 // Anthropic
-// ---------------------------------------------------------------------------
 
 async fn anthropic_text_extract(
     text: &str,
@@ -1233,9 +1220,7 @@ async fn anthropic_vision_extract(
     Ok(data_to_metadata(&parsed))
 }
 
-// ---------------------------------------------------------------------------
 // OpenAI-compatible (Ollama / xAI / custom)
-// ---------------------------------------------------------------------------
 
 async fn openai_compat_text_extract(
     text: &str,
@@ -1352,9 +1337,7 @@ async fn openai_compat_vision_extract(
     Ok(data_to_metadata(&parsed))
 }
 
-// ---------------------------------------------------------------------------
 // Response mapping
-// ---------------------------------------------------------------------------
 
 fn data_to_metadata(data: &HashMap<String, serde_json::Value>) -> DocumentMetadata {
     let is_unreadable = data
@@ -1400,15 +1383,11 @@ fn extract_str_field_any(
     default_value.to_string()
 }
 
-// ---------------------------------------------------------------------------
-// Connection tests
-// ---------------------------------------------------------------------------
-
 /// Probe the configured provider endpoint with the given credentials.
 ///
 /// Uses the live base-URL resolution of the extraction path (so overrides in
-/// `AiConfig` are honored) and always contacts the endpoint , including the
-/// `custom` provider , so a successful test means the endpoint actually
+/// `AiConfig` are honored) and always contacts the endpoint, including the
+/// `custom` provider, so a successful test means the endpoint actually
 /// accepted the key.
 pub async fn test_connection(config: &AiConfig) -> TestConnectionResult {
     let start = Instant::now();
@@ -1426,7 +1405,7 @@ pub async fn test_connection(config: &AiConfig) -> TestConnectionResult {
 
     let model = get_model_name(config);
 
-    let result = match provider {
+    match provider {
         "gemini" => test_gemini_connection(config, api_key, &model, start).await,
         "openai" => {
             test_models_list(config, "openai", &openai_base_url(config), api_key, start).await
@@ -1441,11 +1420,10 @@ pub async fn test_connection(config: &AiConfig) -> TestConnectionResult {
         }
         other => failure_result(
             other,
-            format!("Unknown provider: {}", other),
+            format!("Unknown provider: {other}"),
             start,
         ),
-    };
-    result
+    }
 }
 
 fn failure_result(provider: &str, message: String, start: Instant) -> TestConnectionResult {

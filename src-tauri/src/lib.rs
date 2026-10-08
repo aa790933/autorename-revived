@@ -131,7 +131,7 @@ async fn test_connection(
     app: tauri::AppHandle,
     request: TestConnectionRequest,
 ) -> TestConnectionResult {
-    // Start from the *saved* configuration so the probe exercises the real
+    // Start from the saved configuration so the probe exercises the real
     // base URLs / model wiring, then apply the live UI overrides.
     let mut config = match load_config(app).await {
         Ok(cfg) => cfg.ai,
@@ -167,9 +167,7 @@ pub(crate) fn is_cancelled() -> bool {
     CANCEL_RENAME.load(Ordering::SeqCst)
 }
 
-// ---------------------------------------------------------------------------
 // rename_files pipeline
-// ---------------------------------------------------------------------------
 
 /// Builds the cancelled/skipped FileResult pushed when a batch is interrupted.
 fn cancelled_file_result(path: &str) -> FileResult {
@@ -797,23 +795,21 @@ async fn rename_files(
             next += 1;
             let pipeline = Arc::clone(&pipeline);
             inflight.spawn(async move {
-                // Catch a panic inside the analysis of *one* file so the batch
-                // keeps going and the offending path is still reported , the
-                // previous version lost the index with the panicked task and
-                // only produced a generic "failed unexpectedly".
-                let worker_path = path.clone();
-                let analyzed = AssertUnwindSafe(pipeline.analyze(path))
-                    .catch_unwind()
-                    .await;
-                let outcome = match analyzed {
-                    Ok(result) => result,
-                    Err(_) => Err(failed_file_result(
-                        &worker_path,
-                        "Internal error while analysing this file (worker panicked)".to_string(),
-                    )),
-                };
-                (index, outcome)
-            });
+                            // Catch a panic inside the analysis of *one* file so the batch
+                            // keeps going and the offending path is still reported.
+                            let worker_path = path.clone();
+                            let analyzed = AssertUnwindSafe(pipeline.analyze(path))
+                                .catch_unwind()
+                                .await;
+                            let outcome = match analyzed {
+                                Ok(result) => result,
+                                Err(_) => Err(failed_file_result(
+                                    &worker_path,
+                                    "Internal error while analysing this file (worker panicked)".to_string(),
+                                )),
+                            };
+                            (index, outcome)
+                        });
         }
         if inflight.is_empty() {
             break;
