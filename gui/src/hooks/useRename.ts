@@ -6,7 +6,7 @@ import { useAppStore } from '@/store';
 import { renameFiles, cancelRename, undoRename } from '@/services/api';
 import { showToast } from '@/hooks/useToast';
 import { t } from '@/hooks/useTranslation';
-import type { RenameOptions } from '@/types';
+import type { RenameOptions, FileEntry } from '@/types';
 
 export function useRename() {
   const {
