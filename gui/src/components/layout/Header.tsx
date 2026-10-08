@@ -35,7 +35,6 @@ export function Header() {
         'transition-all duration-300 ease-in-out'
       )}
       style={{ width: `calc(100% - ${sidebarOpen ? '16rem' : '4rem'})` }}
-      data-tauri-drag-region
     >
       <div className="flex items-center justify-between w-full h-full">
         {/* Left side - Menu button and page title */}

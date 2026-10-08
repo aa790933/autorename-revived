@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 use tracing::info;
 
-const GEMINI_DEFAULT_MODEL: &str = "gemini-2.5-flash";
+const GEMINI_DEFAULT_MODEL: &str = "gemini-3.7-flash";
 const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com";
 const OPENAI_API_BASE: &str = "https://api.openai.com";
 const ANTHROPIC_API_BASE: &str = "https://api.anthropic.com";
@@ -40,6 +40,7 @@ pub struct AiConfig {
     pub provider: String,
     pub api_key: String,
     pub model: String,
+    #[serde(default = "default_gemini_model")]
     pub gemini_model: String,
     /// OpenAI-compatible endpoint for `openai` / `anthropic` / `xai` providers.
     /// Used as a fallback for `custom` when `custom_base_url` is empty.
@@ -691,7 +692,6 @@ pub async fn extract_metadata_vision(
 }
 
 /// Retry an async operation up to `MAX_RETRIES` times with exponential backoff.
-/// Returns the first successful result, or the last error.
 async fn retry_async<F, Fut, T, E>(mut action: F) -> Result<T, E>
 where
     F: FnMut() -> Fut,

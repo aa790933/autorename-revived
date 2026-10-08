@@ -1,4 +1,4 @@
-// Sidebar navigation with language/theme controls
+// Sidebar navigation
 import { useTranslation } from 'react-i18next';
 import {
   FileText,
@@ -7,12 +7,10 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
-  Globe,
 } from 'lucide-react';
 import { useAppStore } from '@/store';
 import { Button } from '@/components/ui';
 import { getLanguageDirection, type SupportedLanguage } from '@/i18n';
-import { SUPPORTED_LANGUAGES } from '@/i18n';
 import { AppView } from '@/types';
 import clsx from 'clsx';
 
@@ -92,49 +90,6 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom section - Language only (theme moved to header) */}
-      <div className="p-4 border-t border-neutral-200 dark:border-neutral-800">
-        {sidebarOpen && (
-          <div>
-            <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">
-              {t('common.language')}
-            </p>
-            <div className="space-y-1">
-              {SUPPORTED_LANGUAGES.map(({ code, nativeName }) => (
-                <button
-                  key={code}
-                  onClick={() => {
-                    useAppStore.getState().setLanguage(code);
-                  }}
-                  className={clsx(
-                    'w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all',
-                    language === code
-                      ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 shadow-sm'
-                      : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                  )}
-                  aria-pressed={language === code}
-                >
-                  <Globe className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
-                  <span>{nativeName}</span>
-                  {language === code && (
-                    <svg className="w-4 h-4 ml-auto text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Connection test status */}
-        {connectionTest && (
-          <div className={`mt-3 p-2 rounded-lg text-xs ${connectionTest.success ? 'bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-400' : 'bg-danger-100 dark:bg-danger-900/30 text-danger-700 dark:text-danger-400'}`}>
-            {connectionTest.success
-              ? `${connectionTest.provider}: ${connectionTest.latency_ms}ms`
-              : `${connectionTest.provider}: ${connectionTest.message}`}
-          </div>
-        )}
-      </div>
-    </aside>
+</aside>
   );
 }

@@ -315,7 +315,7 @@ impl Pipeline {
             return Err(failed_file_result(
                 &path,
                 format!(
-                    "AI metadata extraction failed for {} , check your API key, model name, vision setting, and provider configuration.",
+                    "AI metadata extraction failed for {} — check your API key, model name, vision setting, and provider configuration.",
                     path
                 ),
             ));

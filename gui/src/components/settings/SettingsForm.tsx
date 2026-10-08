@@ -8,6 +8,7 @@ import { saveConfigBatch, testApiConnection, reloadConfig } from '@/services/api
 import { ProviderSelector, PROVIDERS } from './ProviderSelector';
 import { Button, Input, Textarea, Select, Toggle } from '@/components/ui';
 import { showToast } from '@/hooks/useToast';
+import { SUPPORTED_LANGUAGES } from '@/i18n';
 import type { AppConfig, AiConfig, DocumentConfig, NamingConfig, UndoConfig, BackupConfig } from '@/types';
 
 type NestedSection = 'ai' | 'document' | 'naming' | 'undo' | 'backup';
@@ -494,6 +495,21 @@ export function SettingsForm({ onBack }: SettingsFormProps) {
             onChange={(e) => handleChangeArray('naming', 'suggestion_languages', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
             placeholder={t('settings.aiLanguages.suggestionLanguagesHint')}
             error={errors['naming.suggestion_languages']}
+          />
+        </div>
+      </section>
+
+      {/* App Language */}
+      <section className="space-y-4" aria-labelledby="app-lang-heading">
+        <h3 id="app-lang-heading" className="text-lg font-semibold text-gray-900 dark:text-white">
+          {t('common.language')}
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Select
+            label={t('settings.aiLanguages.primaryLanguage')}
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            options={SUPPORTED_LANGUAGES.map(({ code, nativeName }) => ({ value: code, label: nativeName }))}
           />
         </div>
       </section>
