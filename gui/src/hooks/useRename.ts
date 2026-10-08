@@ -92,8 +92,6 @@ export function useRename() {
           f.status === 'processing' ? { ...f, status: 'failed' } : f
         ),
       }));
-
-      showToast(t('toasts.renameFailed', { error: message }), 'danger');
     }
   }, [files, processing, config?.ai.provider, setProcessing, setResults, setStatusError]);
 
